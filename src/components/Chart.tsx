@@ -466,7 +466,7 @@ export default function Chart({ candleData, signals, onSignalClick, timeframe, o
             key={option.value}
             onClick={() => onTimeframeChange(option.value)}
             disabled={isLoading}
-            className={`px-2 py-1 sm:px-3.5 sm:py-1.5 text-[10px] sm:text-sm font-medium rounded-md sm:rounded-lg transition-all duration-200 ${
+            className={`px-3 py-2 sm:px-3.5 sm:py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 ${
               timeframe === option.value
                 ? 'bg-point text-white shadow-md ring-2 ring-point/30'
                 : 'text-fg-secondary hover:text-fg-primary hover:bg-bg-tertiary/80'

@@ -250,7 +250,7 @@ export default function InfluencerList({ onInfluencerSelect, selectedInfluencerI
                     {/* 팔로우 버튼 */}
                     <button
                       onClick={(e) => toggleTrack(influencer.id, e)}
-                      className={`flex-shrink-0 p-2 rounded-lg transition-all ${
+                      className={`flex-shrink-0 p-2.5 rounded-lg transition-all ${
                         isTracked
                           ? 'bg-point/20 text-point'
                           : 'bg-bg-tertiary/50 text-fg-tertiary hover:text-fg-secondary hover:bg-bg-tertiary'

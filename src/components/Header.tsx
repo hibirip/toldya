@@ -65,7 +65,7 @@ export default function Header({ ticker }: HeaderProps) {
       <div className="flex items-center flex-shrink-0">
         <button
           onClick={toggleTheme}
-          className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl text-fg-secondary hover:text-fg-primary hover:bg-bg-tertiary/80 transition-all duration-200"
+          className="p-2.5 rounded-xl text-fg-secondary hover:text-fg-primary hover:bg-bg-tertiary/80 transition-all duration-200"
           aria-label="테마 전환"
         >
           {mounted && (

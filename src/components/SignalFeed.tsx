@@ -82,7 +82,7 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
     >
       {/* 피드 컨텐츠 */}
       <div className="flex-1 overflow-y-auto">
-        <div className="p-3 sm:p-4">
+        <div className="p-4">
             {/* Feed 헤더: 타이틀 + 필터 */}
             <header className="mb-3 sm:mb-4">
               <div className="flex items-center justify-between gap-2">
@@ -101,7 +101,7 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
                     <button
                       key={f}
                       onClick={() => onFilterChange(f)}
-                      className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-all duration-200 ${
+                      className={`px-3 py-2 text-xs font-medium rounded-lg transition-all duration-200 ${
                         filter === f
                           ? f === 'LONG'
                             ? 'bg-success/20 text-success'
@@ -119,7 +119,7 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
             </header>
 
             {/* 시그널 리스트 */}
-            <ul className="space-y-2 sm:space-y-3" role="list">
+            <ul className="space-y-3" role="list">
               {signals.map((signal) => {
                 const returnPct = calculateReturn(signal);
                 const isProfit = returnPct >= 0;
@@ -142,12 +142,12 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
                     >
                       <button
                         type="button"
-                        className="w-full p-3 sm:p-4 text-left focus:outline-none focus:ring-2 focus:ring-point/50 rounded-2xl"
+                        className="w-full p-4 text-left focus:outline-none focus:ring-2 focus:ring-point/50 rounded-2xl"
                         onClick={() => toggleExpand(signal.id)}
                         aria-expanded={isExpanded}
                         aria-controls={`signal-content-${signal.id}`}
                       >
-                        <div className="flex items-start gap-2 sm:gap-3">
+                        <div className="flex items-start gap-3">
                           {/* 프로필 */}
                           <figure className="relative flex-shrink-0">
                             <img

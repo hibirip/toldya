@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
 import Chart from '@/components/Chart';
 import SidePanel from '@/components/SidePanel';
+import DragHandle from '@/components/DragHandle';
 import { CandleData, FilterType, TimeframeType, Signal } from '@/types';
 import { TickerPrice, fetchBTCCandlesClient } from '@/lib/binance';
 import { useBinanceWebSocket, RealtimeTicker, RealtimeCandle } from '@/hooks/useBinanceWebSocket';
@@ -22,6 +23,43 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
   const [isLoading, setIsLoading] = useState(false);
   const [realtimeTicker, setRealtimeTicker] = useState<RealtimeTicker | null>(null);
   const [selectedInfluencerId, setSelectedInfluencerId] = useState<string | null>(null);
+
+  // 차트 높이 상태 (모바일용 드래그 리사이즈)
+  const [chartHeight, setChartHeight] = useState(40); // 기본값 40vh
+  const [isMobile, setIsMobile] = useState(false);
+
+  // localStorage에서 저장된 높이 불러오기 & 모바일 감지
+  useEffect(() => {
+    // 모바일 감지 (lg 브레이크포인트 미만)
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    // localStorage에서 저장된 높이 불러오기
+    const savedHeight = localStorage.getItem('toldya_chart_height');
+    if (savedHeight) {
+      const parsed = parseFloat(savedHeight);
+      if (!isNaN(parsed) && parsed >= 25 && parsed <= 70) {
+        setChartHeight(parsed);
+      }
+    }
+
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // 차트 높이 변경 핸들러
+  const handleChartHeightChange = useCallback((newHeight: number) => {
+    setChartHeight(newHeight);
+    // 차트 리사이즈 이벤트 발생
+    window.dispatchEvent(new Event('resize'));
+  }, []);
+
+  // 드래그 종료 시 localStorage에 저장
+  const handleDragEnd = useCallback(() => {
+    localStorage.setItem('toldya_chart_height', chartHeight.toString());
+  }, [chartHeight]);
 
   // 하이라이트 타이머 ref (메모리 누수 방지)
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -159,8 +197,11 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
       <Header ticker={currentTicker} />
 
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-        {/* 차트 영역 */}
-        <div className="h-[55vh] sm:h-[60vh] md:h-[65vh] lg:h-full lg:flex-[7] border-b lg:border-b-0 lg:border-r border-border-primary flex-shrink-0">
+        {/* 차트 영역 - 모바일에서는 동적 높이 */}
+        <div
+          className="lg:h-full lg:flex-[7] border-b lg:border-b-0 lg:border-r border-border-primary flex-shrink-0"
+          style={isMobile ? { height: `${chartHeight}vh` } : undefined}
+        >
           <Chart
             candleData={candleData}
             signals={filteredSignals}
@@ -170,6 +211,16 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
             isLoading={isLoading}
           />
         </div>
+
+        {/* 드래그 핸들 - 모바일/태블릿에서만 표시 */}
+        <DragHandle
+          className="lg:hidden"
+          currentHeight={chartHeight}
+          onHeightChange={handleChartHeightChange}
+          onDragEnd={handleDragEnd}
+          minHeight={25}
+          maxHeight={70}
+        />
 
         {/* 시그널 피드 영역 */}
         <aside className="flex-1 lg:flex-[3] lg:min-w-[320px] lg:max-w-[400px] overflow-hidden min-h-0">
