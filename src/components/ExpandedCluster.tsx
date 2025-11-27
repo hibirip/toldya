@@ -93,11 +93,11 @@ export default function ExpandedCluster({
         );
       })}
 
-      {/* 닫기 버튼 */}
+      {/* 닫기 버튼 - 모바일에서 더 큰 터치 영역 */}
       <button
-        className="absolute z-50 w-6 h-6 rounded-full bg-bg-elevated border border-border
+        className="absolute z-50 w-8 h-8 sm:w-6 sm:h-6 rounded-full bg-bg-elevated border border-border
           flex items-center justify-center text-fg-secondary hover:text-fg-primary
-          hover:bg-bg-tertiary transition-colors"
+          hover:bg-bg-tertiary transition-colors text-lg sm:text-base"
         style={{
           left: cluster.x + 60,
           top: cluster.y - 60,

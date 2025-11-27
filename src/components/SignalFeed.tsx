@@ -4,8 +4,6 @@ import { useRef, useEffect, useState } from 'react';
 import { Signal, FilterType } from '@/types';
 import { toDisplayFormat } from '@/lib/timeUtils';
 
-type TabType = 'feed' | 'ranks';
-
 interface SignalFeedProps {
   signals: Signal[];
   highlightedId: string | null;
@@ -15,7 +13,6 @@ interface SignalFeedProps {
 }
 
 export default function SignalFeed({ signals, highlightedId, currentPrice, filter, onFilterChange }: SignalFeedProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('feed');
   const filters: FilterType[] = ['ALL', 'LONG', 'SHORT'];
   const itemRefs = useRef<{ [key: string]: HTMLElement | null }>({});
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -71,38 +68,11 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
   return (
     <section
       className="h-full flex flex-col bg-bg-primary/50 min-w-[280px]"
-      aria-label="사이드 패널"
+      aria-label="시그널 피드"
     >
-      {/* 상단 탭 네비게이션 */}
-      <div className="flex-shrink-0 px-3 pt-3">
-        <div className="flex gap-1 p-1 rounded-xl bg-bg-tertiary/50">
-          <button
-            onClick={() => setActiveTab('feed')}
-            className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-              activeTab === 'feed'
-                ? 'bg-bg-primary text-fg-primary shadow-sm'
-                : 'text-fg-tertiary hover:text-fg-secondary'
-            }`}
-          >
-            Feed
-          </button>
-          <button
-            onClick={() => setActiveTab('ranks')}
-            className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-              activeTab === 'ranks'
-                ? 'bg-bg-primary text-fg-primary shadow-sm'
-                : 'text-fg-tertiary hover:text-fg-secondary'
-            }`}
-          >
-            Ranks
-          </button>
-        </div>
-      </div>
-
-      {/* 탭 컨텐츠 */}
+      {/* 피드 컨텐츠 */}
       <div className="flex-1 overflow-y-auto">
-        {activeTab === 'feed' ? (
-          <div className="p-3 sm:p-4">
+        <div className="p-3 sm:p-4">
             {/* Feed 헤더: 타이틀 + 필터 */}
             <header className="mb-3 sm:mb-4">
               <div className="flex items-center justify-between gap-2">
@@ -329,14 +299,6 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
               )}
             </ul>
           </div>
-        ) : (
-          /* Ranks 탭 - Coming Soon */
-          <div className="p-3 sm:p-4 h-full flex flex-col items-center justify-center">
-            <div className="text-center">
-              <p className="text-sm text-fg-tertiary">Coming Soon</p>
-            </div>
-          </div>
-        )}
       </div>
     </section>
   );

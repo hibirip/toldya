@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import Header from '@/components/Header';
 import Chart from '@/components/Chart';
-import SignalFeed from '@/components/SignalFeed';
+import SidePanel from '@/components/SidePanel';
 import { CandleData, FilterType, TimeframeType, Signal } from '@/types';
 import { TickerPrice, fetchBTCCandlesClient } from '@/lib/binance';
 import { useBinanceWebSocket, RealtimeTicker, RealtimeCandle } from '@/hooks/useBinanceWebSocket';
@@ -21,6 +21,7 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
   const [candleData, setCandleData] = useState<CandleData[]>(initialCandleData);
   const [isLoading, setIsLoading] = useState(false);
   const [realtimeTicker, setRealtimeTicker] = useState<RealtimeTicker | null>(null);
+  const [selectedInfluencerId, setSelectedInfluencerId] = useState<string | null>(null);
 
   // REST 데이터의 마지막 캔들 시간
   const lastCandleTime = candleData.length > 0 ? candleData[candleData.length - 1].time : undefined;
@@ -111,11 +112,22 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
     return initialSignals;
   }, [initialSignals]);
 
-  // 필터링된 시그널
+  // 필터링된 시그널 (sentiment + influencer)
   const filteredSignals = useMemo(() => {
-    if (filter === 'ALL') return signalsWithRealPrices;
-    return signalsWithRealPrices.filter((s) => s.sentiment === filter);
-  }, [filter, signalsWithRealPrices]);
+    let result = signalsWithRealPrices;
+
+    // 인플루언서 필터
+    if (selectedInfluencerId) {
+      result = result.filter((s) => s.influencer_id === selectedInfluencerId);
+    }
+
+    // sentiment 필터
+    if (filter !== 'ALL') {
+      result = result.filter((s) => s.sentiment === filter);
+    }
+
+    return result;
+  }, [filter, signalsWithRealPrices, selectedInfluencerId]);
 
   // 차트에서 시그널 클릭 시
   const handleSignalClick = (signalId: string) => {
@@ -130,7 +142,7 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
 
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
         {/* 차트 영역 */}
-        <div className="h-[50vh] sm:h-[55vh] md:h-[60vh] lg:h-full lg:flex-[7] border-b lg:border-b-0 lg:border-r border-border-primary flex-shrink-0">
+        <div className="h-[55vh] sm:h-[60vh] md:h-[65vh] lg:h-full lg:flex-[7] border-b lg:border-b-0 lg:border-r border-border-primary flex-shrink-0">
           <Chart
             candleData={candleData}
             signals={filteredSignals}
@@ -143,12 +155,14 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
 
         {/* 시그널 피드 영역 */}
         <aside className="flex-1 lg:flex-[3] lg:min-w-[320px] lg:max-w-[400px] overflow-hidden min-h-0">
-          <SignalFeed
+          <SidePanel
             signals={filteredSignals}
             highlightedId={highlightedSignalId}
             currentPrice={currentPrice}
             filter={filter}
             onFilterChange={setFilter}
+            selectedInfluencerId={selectedInfluencerId}
+            onInfluencerSelect={setSelectedInfluencerId}
           />
         </aside>
       </main>

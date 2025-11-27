@@ -55,7 +55,7 @@ export default function Header({ ticker }: HeaderProps) {
 
           {/* 24h 거래량 */}
           <div className="hidden md:flex items-center gap-1">
-            <span className="text-fg-muted text-[10px]">24h</span>
+            <span className="text-fg-tertiary text-[10px] font-medium">24h</span>
             <span className="text-fg-secondary font-mono text-xs">${ticker?.volume || '0'}B</span>
           </div>
         </div>

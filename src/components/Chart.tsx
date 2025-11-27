@@ -70,6 +70,8 @@ const TIMEFRAME_OPTIONS: { value: TimeframeType; label: string }[] = [
   { value: '1h', label: '1H' },
   { value: '4h', label: '4H' },
   { value: '1d', label: '1D' },
+  { value: '1w', label: '1W' },
+  { value: '1M', label: '1M' },
 ];
 
 export default function Chart({ candleData, signals, onSignalClick, timeframe, onTimeframeChange, isLoading }: ChartProps) {
@@ -451,7 +453,7 @@ export default function Chart({ candleData, signals, onSignalClick, timeframe, o
             disabled={isLoading}
             className={`px-2 py-1 sm:px-3.5 sm:py-1.5 text-[10px] sm:text-sm font-medium rounded-md sm:rounded-lg transition-all duration-200 ${
               timeframe === option.value
-                ? 'bg-point text-white shadow-sm'
+                ? 'bg-point text-white shadow-md ring-2 ring-point/30'
                 : 'text-fg-secondary hover:text-fg-primary hover:bg-bg-tertiary/80'
             } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >

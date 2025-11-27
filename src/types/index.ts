@@ -33,7 +33,7 @@ export interface CandleData {
 
 export type FilterType = 'ALL' | 'LONG' | 'SHORT';
 
-export type TimeframeType = '1h' | '4h' | '1d';
+export type TimeframeType = '1h' | '4h' | '1d' | '1w' | '1M';
 
 // 마커 클러스터링을 위한 타입
 export interface MarkerPosition {

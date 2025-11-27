@@ -33,6 +33,8 @@ const timeframeToInterval: Record<TimeframeType, string> = {
   '1h': '1h',
   '4h': '4h',
   '1d': '1d',
+  '1w': '1w',
+  '1M': '1M',
 };
 
 export function useBinanceWebSocket({
