@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import Header from '@/components/Header';
 import Chart from '@/components/Chart';
 import SidePanel from '@/components/SidePanel';
@@ -19,8 +19,7 @@ interface DashboardProps {
 
 export default function Dashboard({ initialCandleData, ticker: initialTicker, initialSignals = [] }: DashboardProps) {
   const [filter, setFilter] = useState<FilterType>('ALL');
-  const [highlightedSignalId, setHighlightedSignalId] = useState<string | null>(null);
-  const [focusedSignalId, setFocusedSignalId] = useState<string | null>(null);
+  const [selectedSignalId, setSelectedSignalId] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<TimeframeType>('1h');
   const [candleData, setCandleData] = useState<CandleData[]>(initialCandleData);
   const [isLoading, setIsLoading] = useState(false);
@@ -66,10 +65,6 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
   const handleDragEnd = useCallback(() => {
     localStorage.setItem('toldya_chart_height', chartHeight.toString());
   }, [chartHeight]);
-
-  // 하이라이트 타이머 ref (메모리 누수 방지)
-  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const focusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // REST 데이터의 마지막 캔들 시간
   const lastCandleTime = candleData.length > 0 ? candleData[candleData.length - 1].time : undefined;
@@ -247,42 +242,9 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
     return result;
   }, [filter, signalsWithRealPrices, selectedInfluencerId]);
 
-  // 차트에서 시그널 클릭 시 (타이머 정리로 메모리 누수 방지)
-  const handleSignalClick = useCallback((signalId: string) => {
-    // 이전 타이머 정리
-    if (highlightTimeoutRef.current) {
-      clearTimeout(highlightTimeoutRef.current);
-    }
-    setHighlightedSignalId(signalId);
-    // 3초 후 하이라이트 해제
-    highlightTimeoutRef.current = setTimeout(() => {
-      setHighlightedSignalId(null);
-    }, 3000);
-  }, []);
-
-  // 시그널 카드 클릭 시 차트에서 마커로 이동
-  const handleCardClick = useCallback((signalId: string) => {
-    // 이전 타이머 정리
-    if (focusTimeoutRef.current) {
-      clearTimeout(focusTimeoutRef.current);
-    }
-    setFocusedSignalId(signalId);
-    // 3초 후 포커스 해제
-    focusTimeoutRef.current = setTimeout(() => {
-      setFocusedSignalId(null);
-    }, 3000);
-  }, []);
-
-  // 컴포넌트 언마운트 시 타이머 정리
-  useEffect(() => {
-    return () => {
-      if (highlightTimeoutRef.current) {
-        clearTimeout(highlightTimeoutRef.current);
-      }
-      if (focusTimeoutRef.current) {
-        clearTimeout(focusTimeoutRef.current);
-      }
-    };
+  // 시그널 선택 핸들러 (토글 방식 - 카드/마커 클릭 통합)
+  const handleSignalSelect = useCallback((signalId: string) => {
+    setSelectedSignalId((prev) => (prev === signalId ? null : signalId));
   }, []);
 
   return (
@@ -298,8 +260,8 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
           <Chart
             candleData={candleData}
             signals={filteredSignals}
-            onSignalClick={handleSignalClick}
-            focusedSignalId={focusedSignalId}
+            onSignalClick={handleSignalSelect}
+            selectedSignalId={selectedSignalId}
             timeframe={timeframe}
             onTimeframeChange={handleTimeframeChange}
             isLoading={isLoading}
@@ -320,13 +282,13 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
         <aside className="flex-1 lg:flex-[3] lg:min-w-[320px] lg:max-w-[400px] overflow-hidden min-h-0">
           <SidePanel
             signals={filteredSignals}
-            highlightedId={highlightedSignalId}
+            selectedSignalId={selectedSignalId}
             currentPrice={currentPrice}
             filter={filter}
             onFilterChange={setFilter}
             selectedInfluencerId={selectedInfluencerId}
             onInfluencerSelect={setSelectedInfluencerId}
-            onCardClick={handleCardClick}
+            onSignalSelect={handleSignalSelect}
           />
         </aside>
       </main>

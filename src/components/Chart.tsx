@@ -61,7 +61,7 @@ interface ChartProps {
   candleData: CandleData[];
   signals: Signal[];
   onSignalClick?: (signalId: string) => void;
-  focusedSignalId?: string | null;
+  selectedSignalId?: string | null;
   timeframe: TimeframeType;
   onTimeframeChange: (tf: TimeframeType) => void;
   isLoading: boolean;
@@ -85,7 +85,7 @@ const DEFAULT_VISIBLE_CANDLES: Record<TimeframeType, number> = {
   '1M': 0,   // 전체 표시
 };
 
-export default function Chart({ candleData, signals, onSignalClick, focusedSignalId, timeframe, onTimeframeChange, isLoading }: ChartProps) {
+export default function Chart({ candleData, signals, onSignalClick, selectedSignalId, timeframe, onTimeframeChange, isLoading }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -485,13 +485,13 @@ export default function Chart({ candleData, signals, onSignalClick, focusedSigna
     setExpandedClusterId(null);
   }, [timeframe, signals]);
 
-  // 시그널 카드 클릭 시 차트 스크롤 및 마커 하이라이트
+  // 시그널 선택 시 차트 스크롤
   useEffect(() => {
-    if (!focusedSignalId || !chartRef.current) return;
+    if (!selectedSignalId || !chartRef.current) return;
 
     // 해당 시그널의 마커 데이터 찾기
     const markerData = markerDataListRef.current.find(
-      (m) => m.signal.id === focusedSignalId
+      (m) => m.signal.id === selectedSignalId
     );
 
     if (markerData) {
@@ -515,19 +515,10 @@ export default function Chart({ candleData, signals, onSignalClick, focusedSigna
         }
       }
 
-      // 마커 하이라이트 애니메이션
-      const markerEl = markerRefsMap.current.get(focusedSignalId);
-      if (markerEl) {
-        markerEl.classList.add('marker-focus-pulse');
-        setTimeout(() => {
-          markerEl.classList.remove('marker-focus-pulse');
-        }, 3000);
-      }
-
       // 약간의 딜레이 후 마커 위치 업데이트
       setTimeout(() => updateMarkerPositions(), 100);
     }
-  }, [focusedSignalId, updateMarkerPositions]);
+  }, [selectedSignalId, updateMarkerPositions]);
 
   return (
     <div className="relative w-full h-full min-h-[250px] sm:min-h-[300px] md:min-h-[400px] overflow-hidden">
@@ -565,7 +556,9 @@ export default function Chart({ candleData, signals, onSignalClick, focusedSigna
       )}
 
       {/* 커스텀 마커 오버레이 (프로필 + 방향) - ref 기반 DOM 조작 */}
-      {markerDataList.map((markerData) => (
+      {markerDataList.map((markerData) => {
+        const isSelected = selectedSignalId === markerData.signal.id;
+        return (
         <div
           key={markerData.signal.id}
           ref={(el) => {
@@ -575,15 +568,14 @@ export default function Chart({ candleData, signals, onSignalClick, focusedSigna
               markerRefsMap.current.delete(markerData.signal.id);
             }
           }}
-          className="absolute left-0 top-0 pointer-events-none z-10"
+          className={`absolute left-0 top-0 pointer-events-none ${isSelected ? 'z-50' : 'z-10'}`}
           style={{
             willChange: 'transform, visibility',
             visibility: 'hidden', // 초기에는 숨김, updateMarkerPositions에서 표시
           }}
         >
           <div
-            className="flex flex-col items-center hover:scale-110 pointer-events-auto cursor-pointer"
-            style={{ transition: 'transform 0.1s ease-out' }}
+            className={`flex flex-col items-center pointer-events-auto cursor-pointer marker-hover ${isSelected ? 'marker-selected' : ''}`}
             onClick={() => onSignalClick?.(markerData.signal.id)}
             onMouseEnter={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
@@ -628,7 +620,8 @@ export default function Chart({ candleData, signals, onSignalClick, focusedSigna
             )}
           </div>
         </div>
-      ))}
+        )
+      })}
 
       {/* 클러스터 마커 - ref 기반 DOM 조작 */}
       {clusterDataList.map((clusterData) => {

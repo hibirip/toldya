@@ -9,24 +9,24 @@ type TabType = 'signals' | 'influencers';
 
 interface SidePanelProps {
   signals: Signal[];
-  highlightedId: string | null;
+  selectedSignalId: string | null;
   currentPrice: number;
   filter: FilterType;
   onFilterChange: (filter: FilterType) => void;
   selectedInfluencerId: string | null;
   onInfluencerSelect: (influencerId: string | null) => void;
-  onCardClick?: (signalId: string) => void;
+  onSignalSelect: (signalId: string) => void;
 }
 
 export default function SidePanel({
   signals,
-  highlightedId,
+  selectedSignalId,
   currentPrice,
   filter,
   onFilterChange,
   selectedInfluencerId,
   onInfluencerSelect,
-  onCardClick,
+  onSignalSelect,
 }: SidePanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>('signals');
 
@@ -101,11 +101,11 @@ export default function SidePanel({
         {activeTab === 'signals' ? (
           <SignalFeed
             signals={signals}
-            highlightedId={highlightedId}
+            selectedId={selectedSignalId}
             currentPrice={currentPrice}
             filter={filter}
             onFilterChange={onFilterChange}
-            onCardClick={onCardClick}
+            onSelect={onSignalSelect}
           />
         ) : (
           <InfluencerList

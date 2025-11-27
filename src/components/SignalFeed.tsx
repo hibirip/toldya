@@ -6,30 +6,16 @@ import { toDisplayFormat } from '@/lib/timeUtils';
 
 interface SignalFeedProps {
   signals: Signal[];
-  highlightedId: string | null;
+  selectedId: string | null;
   currentPrice: number;
   filter: FilterType;
   onFilterChange: (filter: FilterType) => void;
-  onCardClick?: (signalId: string) => void;
+  onSelect: (signalId: string) => void;
 }
 
-export default function SignalFeed({ signals, highlightedId, currentPrice, filter, onFilterChange, onCardClick }: SignalFeedProps) {
+export default function SignalFeed({ signals, selectedId, currentPrice, filter, onFilterChange, onSelect }: SignalFeedProps) {
   const filters: FilterType[] = ['ALL', 'LONG', 'SHORT'];
   const itemRefs = useRef<{ [key: string]: HTMLElement | null }>({});
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-
-  // 카드 확장/축소 토글
-  const toggleExpand = (id: string) => {
-    setExpandedIds((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
-      return newSet;
-    });
-  };
 
   // 수익률 계산 (entry_price가 0이면 null 반환)
   const calculateReturn = (signal: Signal): number | null => {
@@ -57,15 +43,15 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
     return '매우 낮은 신뢰도';
   };
 
-  // 하이라이트된 항목으로 스크롤
+  // 선택된 항목으로 스크롤
   useEffect(() => {
-    if (highlightedId && itemRefs.current[highlightedId]) {
-      itemRefs.current[highlightedId]?.scrollIntoView({
+    if (selectedId && itemRefs.current[selectedId]) {
+      itemRefs.current[selectedId]?.scrollIntoView({
         behavior: 'smooth',
         block: 'center',
       });
     }
-  }, [highlightedId]);
+  }, [selectedId]);
 
   // signals 변경 시 사라진 항목의 refs 정리 (메모리 누수 방지)
   useEffect(() => {
@@ -126,8 +112,7 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
                 const returnPct = calculateReturn(signal);
                 const hasPrice = returnPct !== null;
                 const isProfit = hasPrice && returnPct >= 0;
-                const isHighlighted = highlightedId === signal.id;
-                const isExpanded = expandedIds.has(signal.id);
+                const isSelected = selectedId === signal.id;
                 const trustScore = signal.influencer?.trust_score || 0;
 
                 return (
@@ -137,7 +122,7 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
                         itemRefs.current[signal.id] = el;
                       }}
                       className={`rounded-2xl transition-all duration-300 ${
-                        isHighlighted || isExpanded
+                        isSelected
                           ? 'glass-card-highlight'
                           : 'glass-card hover-lift'
                       }`}
@@ -146,11 +131,8 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
                       <button
                         type="button"
                         className="w-full p-4 text-left focus:outline-none focus:ring-2 focus:ring-point/50 rounded-2xl"
-                        onClick={() => {
-                          toggleExpand(signal.id);
-                          onCardClick?.(signal.id);
-                        }}
-                        aria-expanded={isExpanded}
+                        onClick={() => onSelect(signal.id)}
+                        aria-expanded={isSelected}
                         aria-controls={`signal-content-${signal.id}`}
                       >
                         <div className="flex items-start gap-3">
@@ -193,7 +175,7 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
 
                             {/* 텍스트 */}
                             <div className="mb-2 sm:mb-3" id={`signal-content-${signal.id}`}>
-                              {isExpanded ? (
+                              {isSelected ? (
                                 <p className="text-fg-secondary text-xs sm:text-sm whitespace-pre-wrap leading-relaxed">
                                   {signal.full_text}
                                 </p>
@@ -212,7 +194,7 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
                             </div>
 
                             {/* 확장 시 이미지 */}
-                            {isExpanded && signal.has_media && signal.media_url && (
+                            {isSelected && signal.has_media && signal.media_url && (
                               <figure className="mb-3 rounded-xl overflow-hidden bg-bg-tertiary/50">
                                 <img
                                   src={signal.media_url}
@@ -262,7 +244,7 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
                         </div>
 
                         {/* 확장 힌트 */}
-                        {!isExpanded && (
+                        {!isSelected && (
                           <div className="mt-2 sm:mt-3 text-center">
                             <span className="text-fg-muted text-[10px] sm:text-xs inline-flex items-center gap-1 px-2 py-0.5 sm:px-3 sm:py-1 rounded-full bg-bg-tertiary/30 whitespace-nowrap">
                               전체 보기
@@ -275,7 +257,7 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
                       </button>
 
                       {/* 확장 시 하단 액션 바 */}
-                      {isExpanded && (
+                      {isSelected && (
                         <footer className="px-3 py-2 sm:px-4 sm:py-3 border-t border-border-primary/50 bg-bg-tertiary/30 rounded-b-2xl">
                           <div className="flex items-center justify-between gap-2">
                             <a
@@ -296,7 +278,7 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
                               className="text-fg-tertiary hover:text-fg-secondary text-xs sm:text-sm transition-colors inline-flex items-center gap-1"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                toggleExpand(signal.id);
+                                onSelect(signal.id);
                               }}
                               aria-label="시그널 카드 접기"
                             >

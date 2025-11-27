@@ -240,6 +240,55 @@ body {
   z-index: 50 !important;
 }
 
+/* 선택된 마커 강조 스타일 */
+
+/* 마커 호버 효과 (선택 전) */
+.marker-hover:not(.marker-selected) {
+  transition: transform 0.2s ease-out;
+}
+
+.marker-hover:hover:not(.marker-selected) {
+  transform: scale(1.08);
+}
+
+/* 선택된 마커 - 기본 */
+.marker-selected {
+  transform: scale(1.15);
+  transition: transform 0.2s ease-out;
+}
+
+/* 선택된 마커의 프로필 이미지 - LONG (초록 글로우) */
+.marker-selected .border-success {
+  box-shadow:
+    0 0 0 2px var(--success),
+    0 0 10px 3px color-mix(in srgb, var(--success) 50%, transparent),
+    0 0 20px 6px color-mix(in srgb, var(--success) 25%, transparent);
+  transition: box-shadow 0.2s ease-out;
+}
+
+/* 선택된 마커의 프로필 이미지 - SHORT (빨강 글로우) */
+.marker-selected .border-danger {
+  box-shadow:
+    0 0 0 2px var(--danger),
+    0 0 10px 3px color-mix(in srgb, var(--danger) 50%, transparent),
+    0 0 20px 6px color-mix(in srgb, var(--danger) 25%, transparent);
+  transition: box-shadow 0.2s ease-out;
+}
+
+/* 선택된 마커의 화살표 - LONG (더 밝은 초록) */
+.marker-selected .text-success {
+  color: #4ade80 !important; /* emerald-400 → green-400 더 밝게 */
+  filter: drop-shadow(0 0 4px var(--success));
+  transition: color 0.2s ease-out, filter 0.2s ease-out;
+}
+
+/* 선택된 마커의 화살표 - SHORT (더 밝은 빨강) */
+.marker-selected .text-danger {
+  color: #f87171 !important; /* red-500 → red-400 더 밝게 */
+  filter: drop-shadow(0 0 4px var(--danger));
+  transition: color 0.2s ease-out, filter 0.2s ease-out;
+}
+
 /* ============================================
    Utility Classes
    ============================================ */
