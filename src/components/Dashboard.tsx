@@ -20,6 +20,7 @@ interface DashboardProps {
 export default function Dashboard({ initialCandleData, ticker: initialTicker, initialSignals = [] }: DashboardProps) {
   const [filter, setFilter] = useState<FilterType>('ALL');
   const [highlightedSignalId, setHighlightedSignalId] = useState<string | null>(null);
+  const [focusedSignalId, setFocusedSignalId] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<TimeframeType>('1h');
   const [candleData, setCandleData] = useState<CandleData[]>(initialCandleData);
   const [isLoading, setIsLoading] = useState(false);
@@ -68,6 +69,7 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
 
   // 하이라이트 타이머 ref (메모리 누수 방지)
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const focusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // REST 데이터의 마지막 캔들 시간
   const lastCandleTime = candleData.length > 0 ? candleData[candleData.length - 1].time : undefined;
@@ -258,11 +260,27 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
     }, 3000);
   }, []);
 
+  // 시그널 카드 클릭 시 차트에서 마커로 이동
+  const handleCardClick = useCallback((signalId: string) => {
+    // 이전 타이머 정리
+    if (focusTimeoutRef.current) {
+      clearTimeout(focusTimeoutRef.current);
+    }
+    setFocusedSignalId(signalId);
+    // 3초 후 포커스 해제
+    focusTimeoutRef.current = setTimeout(() => {
+      setFocusedSignalId(null);
+    }, 3000);
+  }, []);
+
   // 컴포넌트 언마운트 시 타이머 정리
   useEffect(() => {
     return () => {
       if (highlightTimeoutRef.current) {
         clearTimeout(highlightTimeoutRef.current);
+      }
+      if (focusTimeoutRef.current) {
+        clearTimeout(focusTimeoutRef.current);
       }
     };
   }, []);
@@ -281,6 +299,7 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
             candleData={candleData}
             signals={filteredSignals}
             onSignalClick={handleSignalClick}
+            focusedSignalId={focusedSignalId}
             timeframe={timeframe}
             onTimeframeChange={handleTimeframeChange}
             isLoading={isLoading}
@@ -307,6 +326,7 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
             onFilterChange={setFilter}
             selectedInfluencerId={selectedInfluencerId}
             onInfluencerSelect={setSelectedInfluencerId}
+            onCardClick={handleCardClick}
           />
         </aside>
       </main>

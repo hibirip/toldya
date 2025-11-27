@@ -10,9 +10,10 @@ interface SignalFeedProps {
   currentPrice: number;
   filter: FilterType;
   onFilterChange: (filter: FilterType) => void;
+  onCardClick?: (signalId: string) => void;
 }
 
-export default function SignalFeed({ signals, highlightedId, currentPrice, filter, onFilterChange }: SignalFeedProps) {
+export default function SignalFeed({ signals, highlightedId, currentPrice, filter, onFilterChange, onCardClick }: SignalFeedProps) {
   const filters: FilterType[] = ['ALL', 'LONG', 'SHORT'];
   const itemRefs = useRef<{ [key: string]: HTMLElement | null }>({});
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -136,7 +137,7 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
                         itemRefs.current[signal.id] = el;
                       }}
                       className={`rounded-2xl transition-all duration-300 ${
-                        isHighlighted
+                        isHighlighted || isExpanded
                           ? 'glass-card-highlight'
                           : 'glass-card hover-lift'
                       }`}
@@ -145,7 +146,10 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
                       <button
                         type="button"
                         className="w-full p-4 text-left focus:outline-none focus:ring-2 focus:ring-point/50 rounded-2xl"
-                        onClick={() => toggleExpand(signal.id)}
+                        onClick={() => {
+                          toggleExpand(signal.id);
+                          onCardClick?.(signal.id);
+                        }}
                         aria-expanded={isExpanded}
                         aria-controls={`signal-content-${signal.id}`}
                       >

@@ -61,6 +61,7 @@ interface ChartProps {
   candleData: CandleData[];
   signals: Signal[];
   onSignalClick?: (signalId: string) => void;
+  focusedSignalId?: string | null;
   timeframe: TimeframeType;
   onTimeframeChange: (tf: TimeframeType) => void;
   isLoading: boolean;
@@ -84,7 +85,7 @@ const DEFAULT_VISIBLE_CANDLES: Record<TimeframeType, number> = {
   '1M': 0,   // 전체 표시
 };
 
-export default function Chart({ candleData, signals, onSignalClick, timeframe, onTimeframeChange, isLoading }: ChartProps) {
+export default function Chart({ candleData, signals, onSignalClick, focusedSignalId, timeframe, onTimeframeChange, isLoading }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -478,10 +479,55 @@ export default function Chart({ candleData, signals, onSignalClick, timeframe, o
     updateMarkerPositions();
   }, [markerDataList, clusterDataList, updateMarkerPositions]);
 
-  // 클러스터 데이터 변경 시 펼쳐진 클러스터 닫기
+  // 타임프레임/시그널 변경 시 펼쳐진 클러스터 닫기
+  // (실시간 캔들 업데이트에는 영향받지 않도록 candleData 제외)
   useEffect(() => {
     setExpandedClusterId(null);
-  }, [clusterDataList]);
+  }, [timeframe, signals]);
+
+  // 시그널 카드 클릭 시 차트 스크롤 및 마커 하이라이트
+  useEffect(() => {
+    if (!focusedSignalId || !chartRef.current) return;
+
+    // 해당 시그널의 마커 데이터 찾기
+    const markerData = markerDataListRef.current.find(
+      (m) => m.signal.id === focusedSignalId
+    );
+
+    if (markerData) {
+      // 차트를 해당 시간으로 스크롤 (중앙에 위치)
+      const timeScale = chartRef.current.timeScale();
+      const visibleRange = timeScale.getVisibleLogicalRange();
+      if (visibleRange) {
+        const visibleWidth = visibleRange.to - visibleRange.from;
+        const targetTime = markerData.alignedTime as Time;
+
+        // 해당 시간의 logical index 찾기
+        const coordinate = timeScale.timeToCoordinate(targetTime);
+        if (coordinate !== null) {
+          const logicalIndex = timeScale.coordinateToLogical(coordinate);
+          if (logicalIndex !== null) {
+            // 마커가 화면 중앙에 오도록 스크롤
+            const newFrom = logicalIndex - visibleWidth / 2;
+            const newTo = logicalIndex + visibleWidth / 2;
+            timeScale.setVisibleLogicalRange({ from: newFrom, to: newTo });
+          }
+        }
+      }
+
+      // 마커 하이라이트 애니메이션
+      const markerEl = markerRefsMap.current.get(focusedSignalId);
+      if (markerEl) {
+        markerEl.classList.add('marker-focus-pulse');
+        setTimeout(() => {
+          markerEl.classList.remove('marker-focus-pulse');
+        }, 3000);
+      }
+
+      // 약간의 딜레이 후 마커 위치 업데이트
+      setTimeout(() => updateMarkerPositions(), 100);
+    }
+  }, [focusedSignalId, updateMarkerPositions]);
 
   return (
     <div className="relative w-full h-full min-h-[250px] sm:min-h-[300px] md:min-h-[400px] overflow-hidden">
