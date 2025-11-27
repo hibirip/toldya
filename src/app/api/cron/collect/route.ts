@@ -101,49 +101,46 @@ const TWITTER_COOKIES = [
 ];
 
 // ============================================
-// 인플루언서 그룹 (50인, 3분할)
+// 인플루언서 그룹 (50인, 2분할 - Vercel 무료 플랜 Cron 제한)
 // ============================================
 
-// GROUP_MOVERS (10명) - 시장 영향력 있는 인물
-const GROUP_MOVERS = [
+// GROUP_A (25명) - MOVERS + CHARTISTS 일부
+const GROUP_A = [
+  // MOVERS (10명)
   'elonmusk', 'saylor', 'jack', 'maxkeiser', 'Adam3us',
-  'CryptoHayes', 'cz_binance', 'excellion', 'jackmallers', 'pierre_rochard'
-];
-
-// GROUP_CHARTISTS (25명) - 차트/기술적 분석가
-const GROUP_CHARTISTS = [
+  'CryptoHayes', 'cz_binance', 'excellion', 'jackmallers', 'pierre_rochard',
+  // CHARTISTS 일부 (15명)
   'PeterLBrandt', 'crediblecrypto', 'pentosh1', 'TheCryptoDog', 'StockmoneyL',
   'MerlijnTrader', 'ColinTCrypto', 'ave_eli', 'Banana3Stocks', 'TATrader_Alan',
-  'ClaireJensen_', 'CryptoPatel', 'EzyBitcoin', 'Anbessa100', 'realwizard101',
-  'catruffles', 'mckitrick_mark', 'QuidMiner', 'cryptotitans11', 'BtcDose',
-  'COINEO963', 'leebeard73', 'noneisahero', 'Beyoglu124', 'canearnstrategy'
+  'ClaireJensen_', 'CryptoPatel', 'EzyBitcoin', 'Anbessa100', 'realwizard101'
 ];
 
-// GROUP_SENTIMENT (15명) - 온체인/센티먼트 분석가
-const GROUP_SENTIMENT = [
+// GROUP_B (25명) - CHARTISTS 나머지 + SENTIMENT
+const GROUP_B = [
+  // CHARTISTS 나머지 (10명)
+  'catruffles', 'mckitrick_mark', 'QuidMiner', 'cryptotitans11', 'BtcDose',
+  'COINEO963', 'leebeard73', 'noneisahero', 'Beyoglu124', 'canearnstrategy',
+  // SENTIMENT (15명)
   'CryptoCapo_', '100trillionUSD', 'rektcapital', 'santimentfeed', 'jasonpizzino',
   'misterrcrypto', 'TheDustyBC', 'hiRavenCrypto', 'kyledoops', 'trade_centurion',
   'xiaweb3', 'ChainGPTAI', 'Sober_Trading', 'CloudAction', 'FFC03Josh'
 ];
 
-// 시간대별 그룹 선택 (8시간 간격, 하루 3회)
+// 시간대별 그룹 선택 (12시간 간격, 하루 2회)
 function getCurrentGroup(): string[] {
   const hour = new Date().getUTCHours();
-  // 8시간 단위로 그룹 분할 (하루 1회씩)
-  if (hour < 8) return GROUP_MOVERS;       // 00-07 UTC
-  if (hour < 16) return GROUP_CHARTISTS;   // 08-15 UTC
-  return GROUP_SENTIMENT;                   // 16-23 UTC
+  // 12시간 단위로 그룹 분할
+  if (hour < 12) return GROUP_A;  // 00:00-11:59 UTC
+  return GROUP_B;                  // 12:00-23:59 UTC
 }
 
 function getGroupSlot(): number {
   const hour = new Date().getUTCHours();
-  if (hour < 8) return 0;   // MOVERS
-  if (hour < 16) return 1;  // CHARTISTS
-  return 2;                  // SENTIMENT
+  return hour < 12 ? 0 : 1;
 }
 
 function getGroupName(slot: number): string {
-  return ['MOVERS', 'CHARTISTS', 'SENTIMENT'][slot] || 'UNKNOWN';
+  return ['GROUP_A', 'GROUP_B'][slot] || 'UNKNOWN';
 }
 
 // ============================================
