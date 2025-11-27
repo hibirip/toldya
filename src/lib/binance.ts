@@ -35,15 +35,6 @@ export const TIMEFRAME_LIMITS: Record<TimeframeType, number> = {
   '1M': 24,   // 2년치
 };
 
-// 초기 표시할 캔들 수 (최근 데이터 중심으로 보여줌)
-// -1은 전체 데이터 표시를 의미
-export const INITIAL_VISIBLE_CANDLES: Record<TimeframeType, number> = {
-  '1h': 96,   // 최근 4일 (4 * 24)
-  '4h': 96,   // 최근 16일 (16 * 6)
-  '1d': 60,   // 최근 60일
-  '1w': 52,   // 최근 1년
-  '1M': -1,   // 전체 표시
-};
 
 // Binance timestamp(밀리초)를 Unix timestamp(초)로 변환
 function formatTime(timestamp: number): number {
@@ -195,37 +186,81 @@ export async function fetchBTCCandlesClient(
   }
 }
 
-// BTC/USDT 특정 시점의 과거 가격 가져오기
-export async function fetchHistoricalBTCPrice(unixTimestamp: number): Promise<number | null> {
+// CoinGecko API로 과거 BTC 가격 가져오기 (Vercel에서 차단 안 됨)
+async function fetchHistoricalBTCPriceCoinGecko(unixTimestamp: number): Promise<number | null> {
   try {
-    // Unix timestamp (초) → 밀리초로 변환
+    // CoinGecko market_chart/range API 사용
+    // 해당 시점 전후 5분 범위로 조회
+    const from = unixTimestamp - 300;
+    const to = unixTimestamp + 300;
+
+    const response = await fetch(
+      `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range?vs_currency=usd&from=${from}&to=${to}`,
+      { cache: 'no-store' }
+    );
+
+    if (!response.ok) {
+      console.log('[CoinGecko] Failed to fetch:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (!data.prices || data.prices.length === 0) {
+      console.log('[CoinGecko] No price data for timestamp:', unixTimestamp);
+      return null;
+    }
+
+    // 가장 가까운 시점의 가격 반환
+    // prices: [[timestamp_ms, price], ...]
+    const targetMs = unixTimestamp * 1000;
+    let closestPrice = data.prices[0][1];
+    let closestDiff = Math.abs(data.prices[0][0] - targetMs);
+
+    for (const [timestamp, price] of data.prices) {
+      const diff = Math.abs(timestamp - targetMs);
+      if (diff < closestDiff) {
+        closestDiff = diff;
+        closestPrice = price;
+      }
+    }
+
+    console.log('[CoinGecko] Found price:', Math.round(closestPrice));
+    return Math.round(closestPrice);
+  } catch (error) {
+    console.error('[CoinGecko] Error:', error);
+    return null;
+  }
+}
+
+// BTC/USDT 특정 시점의 과거 가격 가져오기 (Binance → CoinGecko fallback)
+export async function fetchHistoricalBTCPrice(unixTimestamp: number): Promise<number | null> {
+  // 1. Binance 시도
+  try {
     const timestampMs = unixTimestamp * 1000;
 
-    // 해당 시점을 포함하는 1분봉 1개 가져오기
     const response = await fetch(
       `${BINANCE_API}/klines?symbol=BTCUSDT&interval=1m&startTime=${timestampMs}&limit=1`,
       { cache: 'no-store' }
     );
 
-    if (!response.ok) {
-      console.log('[fetchHistoricalBTCPrice] Failed to fetch:', response.status);
-      return null;
+    if (response.ok) {
+      const data: number[][] = await response.json();
+
+      if (data.length > 0) {
+        const closePrice = parseFloat(data[0][4] as unknown as string);
+        console.log('[Binance] Found price:', Math.round(closePrice));
+        return Math.round(closePrice);
+      }
     }
 
-    const data: number[][] = await response.json();
-
-    if (data.length === 0) {
-      console.log('[fetchHistoricalBTCPrice] No data returned for timestamp:', unixTimestamp);
-      return null;
-    }
-
-    // close 가격 반환 (index 4)
-    const closePrice = parseFloat(data[0][4] as unknown as string);
-    return Math.round(closePrice);
+    console.log('[Binance] Failed or no data, trying CoinGecko...');
   } catch (error) {
-    console.error('[fetchHistoricalBTCPrice] Error:', error);
-    return null;
+    console.log('[Binance] Error, trying CoinGecko...', error);
   }
+
+  // 2. CoinGecko fallback
+  return fetchHistoricalBTCPriceCoinGecko(unixTimestamp);
 }
 
 // BTC/USDT 현재 가격 및 24시간 변동률 가져오기

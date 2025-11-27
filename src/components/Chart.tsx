@@ -5,7 +5,6 @@ import { createChart, IChartApi, ISeriesApi, CandlestickData, Time, CrosshairMod
 import { Signal, CandleData, TimeframeType, MarkerPosition, MarkerCluster } from '@/types';
 import { getCandleStartTime, toDisplayFormat } from '@/lib/timeUtils';
 import { clusterMarkers } from '@/lib/clusterSignals';
-import { INITIAL_VISIBLE_CANDLES } from '@/lib/binance';
 import { useTheme } from '@/hooks/useTheme';
 import StackedMarker from './StackedMarker';
 import ExpandedCluster from './ExpandedCluster';
@@ -14,6 +13,7 @@ import ExpandedCluster from './ExpandedCluster';
 interface MarkerData {
   signal: Signal;
   alignedTime: number;
+  candlePrice: number; // 해당 캔들의 close 가격 (entry_price 대신 사용)
 }
 
 interface ClusterData {
@@ -74,6 +74,16 @@ const TIMEFRAME_OPTIONS: { value: TimeframeType; label: string }[] = [
   { value: '1M', label: '1M' },
 ];
 
+// 타임프레임별 기본 표시 캔들 수 (마커 가시성 최적화)
+// 0 = 전체 표시 (fitContent)
+const DEFAULT_VISIBLE_CANDLES: Record<TimeframeType, number> = {
+  '1h': 48,  // 2일
+  '4h': 42,  // 7일
+  '1d': 30,  // 1달
+  '1w': 26,  // 6개월
+  '1M': 0,   // 전체 표시
+};
+
 export default function Chart({ candleData, signals, onSignalClick, timeframe, onTimeframeChange, isLoading }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -97,7 +107,8 @@ export default function Chart({ candleData, signals, onSignalClick, timeframe, o
     x: number;
     y: number;
     signal: Signal | null;
-  }>({ visible: false, x: 0, y: 0, signal: null });
+    candlePrice: number;
+  }>({ visible: false, x: 0, y: 0, signal: null, candlePrice: 0 });
   const { theme } = useTheme();
 
   // Refs for stable references (avoid recreating callbacks)
@@ -139,7 +150,7 @@ export default function Chart({ candleData, signals, onSignalClick, timeframe, o
       const alignedTime = getCandleStartTime(signal.signal_timestamp, currentTimeframe);
       const matchingCandle = candleMap.get(alignedTime);
       if (matchingCandle) {
-        validMarkers.push({ signal, alignedTime });
+        validMarkers.push({ signal, alignedTime, candlePrice: matchingCandle.close });
       }
     });
 
@@ -147,30 +158,47 @@ export default function Chart({ candleData, signals, onSignalClick, timeframe, o
     if (chartRef.current && seriesRef.current) {
       const timeScale = chartRef.current.timeScale();
       const positions: MarkerPosition[] = [];
+      const outsideMarkers: MarkerData[] = []; // 가시 영역 밖 마커
 
       validMarkers.forEach((marker) => {
         const x = timeScale.timeToCoordinate(marker.alignedTime as Time);
-        const y = seriesRef.current!.priceToCoordinate(marker.signal.entry_price);
+        const y = seriesRef.current!.priceToCoordinate(marker.candlePrice); // entry_price 대신 캔들 가격 사용
         if (x !== null && y !== null) {
           positions.push({ signal: marker.signal, x, y });
+        } else {
+          // 가시 영역 밖이어도 마커 데이터는 유지
+          outsideMarkers.push(marker);
         }
       });
 
       const { clusters, standalone } = clusterMarkers(positions, { yThreshold: 25, minClusterSize: 3 });
 
-      // standalone 마커 데이터
-      const standaloneMarkers = standalone.map((pos) => ({
-        signal: pos.signal,
-        alignedTime: getCandleStartTime(pos.signal.signal_timestamp, currentTimeframe),
-      }));
+      // standalone 마커 데이터 + 가시 영역 밖 마커
+      const standaloneMarkers: MarkerData[] = [
+        ...standalone.map((pos) => {
+          const alignedTime = getCandleStartTime(pos.signal.signal_timestamp, currentTimeframe);
+          const candle = candleMap.get(alignedTime);
+          return {
+            signal: pos.signal,
+            alignedTime,
+            candlePrice: candle?.close ?? pos.signal.entry_price, // fallback to entry_price
+          };
+        }),
+        ...outsideMarkers, // 가시 영역 밖 마커도 포함 (이미 candlePrice 있음)
+      ];
 
       // 클러스터 데이터 (MarkerCluster의 signals 사용)
-      const clusterData = clusters.map((cluster) => ({
+      const clusterData: ClusterData[] = clusters.map((cluster) => ({
         id: cluster.id,
-        markers: cluster.signals.map((signal) => ({
-          signal,
-          alignedTime: getCandleStartTime(signal.signal_timestamp, currentTimeframe),
-        })),
+        markers: cluster.signals.map((signal) => {
+          const alignedTime = getCandleStartTime(signal.signal_timestamp, currentTimeframe);
+          const candle = candleMap.get(alignedTime);
+          return {
+            signal,
+            alignedTime,
+            candlePrice: candle?.close ?? signal.entry_price, // fallback to entry_price
+          };
+        }),
       }));
 
       setMarkerDataList(standaloneMarkers);
@@ -204,7 +232,7 @@ export default function Chart({ candleData, signals, onSignalClick, timeframe, o
       if (!markerData) return;
 
       const x = timeScale.timeToCoordinate(markerData.alignedTime as Time);
-      const y = series.priceToCoordinate(markerData.signal.entry_price);
+      const y = series.priceToCoordinate(markerData.candlePrice);
 
       if (x === null || y === null) {
         element.style.visibility = 'hidden';
@@ -227,7 +255,7 @@ export default function Chart({ candleData, signals, onSignalClick, timeframe, o
 
       clusterData.markers.forEach((marker) => {
         const x = timeScale.timeToCoordinate(marker.alignedTime as Time);
-        const y = series.priceToCoordinate(marker.signal.entry_price);
+        const y = series.priceToCoordinate(marker.candlePrice);
         if (x !== null && y !== null) {
           sumX += x;
           sumY += y;
@@ -262,7 +290,7 @@ export default function Chart({ candleData, signals, onSignalClick, timeframe, o
 
       cluster.markers.forEach((marker) => {
         const x = timeScale.timeToCoordinate(marker.alignedTime as Time);
-        const y = series.priceToCoordinate(marker.signal.entry_price);
+        const y = series.priceToCoordinate(marker.candlePrice);
         if (x !== null && y !== null) {
           sumX += x;
           sumY += y;
@@ -332,14 +360,14 @@ export default function Chart({ candleData, signals, onSignalClick, timeframe, o
       }));
       candlestickSeries.setData(formattedData);
       lastFirstCandleTimeRef.current = currentData[0].time;
-      // 타임프레임별 초기 표시 범위 설정
-      const visibleCandles = INITIAL_VISIBLE_CANDLES[timeframeRef.current];
-      if (visibleCandles === -1) {
-        // 전체 데이터 표시 (1M 타임프레임)
+      // 타임프레임별 기본 줌 적용 (마커 가시성 최적화)
+      const visibleCandles = DEFAULT_VISIBLE_CANDLES[timeframe];
+      if (visibleCandles === 0) {
         chart.timeScale().fitContent();
       } else {
         const from = Math.max(0, currentData.length - visibleCandles);
-        chart.timeScale().setVisibleLogicalRange({ from, to: currentData.length - 1 });
+        const to = currentData.length - 1;
+        chart.timeScale().setVisibleLogicalRange({ from, to });
       }
     }
 
@@ -418,14 +446,14 @@ export default function Chart({ candleData, signals, onSignalClick, timeframe, o
       }));
       seriesRef.current.setData(formattedData);
       lastFirstCandleTimeRef.current = firstCandleTime;
-      // 타임프레임별 초기 표시 범위 설정
-      const visibleCandles = INITIAL_VISIBLE_CANDLES[timeframe];
-      if (visibleCandles === -1) {
-        // 전체 데이터 표시 (1M 타임프레임)
+      // 타임프레임별 기본 줌 적용 (마커 가시성 최적화)
+      const visibleCandles = DEFAULT_VISIBLE_CANDLES[timeframe];
+      if (visibleCandles === 0) {
         chartRef.current?.timeScale().fitContent();
       } else {
         const from = Math.max(0, candleData.length - visibleCandles);
-        chartRef.current?.timeScale().setVisibleLogicalRange({ from, to: candleData.length - 1 });
+        const to = candleData.length - 1;
+        chartRef.current?.timeScale().setVisibleLogicalRange({ from, to });
       }
       // 데이터 로드 후 마커 위치 업데이트
       setTimeout(() => updateMarkerPositions(), 50);
@@ -522,6 +550,7 @@ export default function Chart({ candleData, signals, onSignalClick, timeframe, o
                   x,
                   y: markerData.signal.sentiment === 'LONG' ? y + 50 : y,
                   signal: markerData.signal,
+                  candlePrice: markerData.candlePrice,
                 });
               }
             }}
@@ -660,7 +689,7 @@ export default function Chart({ candleData, signals, onSignalClick, timeframe, o
                       </span>
                     </div>
                     <span className="text-fg-secondary text-xs sm:text-sm font-mono px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-md bg-bg-tertiary/50">
-                      ${tooltip.signal.entry_price.toLocaleString()}
+                      ${tooltip.candlePrice.toLocaleString()}
                     </span>
                   </div>
                 </div>

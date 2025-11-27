@@ -5,9 +5,11 @@ import Header from '@/components/Header';
 import Chart from '@/components/Chart';
 import SidePanel from '@/components/SidePanel';
 import DragHandle from '@/components/DragHandle';
-import { CandleData, FilterType, TimeframeType, Signal } from '@/types';
+import { CandleData, FilterType, TimeframeType, Signal, Influencer } from '@/types';
 import { TickerPrice, fetchBTCCandlesClient } from '@/lib/binance';
 import { useBinanceWebSocket, RealtimeTicker, RealtimeCandle } from '@/hooks/useBinanceWebSocket';
+import { supabaseClient } from '@/lib/supabase-client';
+import { getCandleStartTime } from '@/lib/timeUtils';
 
 interface DashboardProps {
   initialCandleData: CandleData[];
@@ -23,6 +25,9 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
   const [isLoading, setIsLoading] = useState(false);
   const [realtimeTicker, setRealtimeTicker] = useState<RealtimeTicker | null>(null);
   const [selectedInfluencerId, setSelectedInfluencerId] = useState<string | null>(null);
+
+  // 시그널 state (실시간 업데이트용)
+  const [signals, setSignals] = useState<Signal[]>(initialSignals);
 
   // 차트 높이 상태 (모바일용 드래그 리사이즈)
   const [chartHeight, setChartHeight] = useState(40); // 기본값 40vh
@@ -148,10 +153,79 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
     ? parseFloat(currentTicker.price)
     : candleData[candleData.length - 1]?.close || 0;
 
-  // 시그널 데이터: DB 데이터만 사용 (Mock 데이터 제거)
+  // Supabase Realtime 구독 (새 시그널 자동 업데이트)
+  useEffect(() => {
+    const channel = supabaseClient
+      .channel('signals-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'signals' },
+        async (payload) => {
+          console.log('[Realtime] New signal received:', payload.new);
+
+          // 인플루언서 정보 가져오기
+          const { data: influencerData } = await supabaseClient
+            .from('influencers')
+            .select('*')
+            .eq('id', payload.new.influencer_id)
+            .single();
+
+          // DB 시그널을 프론트엔드 Signal 타입으로 변환
+          const newSignal: Signal = {
+            id: payload.new.id,
+            influencer_id: payload.new.influencer_id,
+            influencer: influencerData ? {
+              id: influencerData.id,
+              name: influencerData.display_name,
+              handle: influencerData.twitter_handle,
+              avatar_url: influencerData.profile_image_url || '/default-avatar.png',
+              trust_score: 50,
+            } : undefined,
+            coin_symbol: 'BTC',
+            sentiment: payload.new.sentiment,
+            entry_price: payload.new.entry_price,
+            signal_timestamp: payload.new.signal_timestamp,
+            original_text: payload.new.summary || payload.new.original_text?.slice(0, 100) || '',
+            full_text: payload.new.original_text || '',
+            source_url: payload.new.source_url,
+            has_media: false,
+          };
+
+          // 새 시그널을 맨 앞에 추가
+          setSignals((prev) => [newSignal, ...prev]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabaseClient.removeChannel(channel);
+    };
+  }, []);
+
+  // 시그널 데이터 (entry_price가 0인 경우 candleData에서 가격 보정)
   const signalsWithRealPrices = useMemo(() => {
-    return initialSignals;
-  }, [initialSignals]);
+    if (candleData.length === 0) return signals;
+
+    // O(1) 조회를 위한 캔들 Map 생성
+    const candleMap = new Map(candleData.map((c) => [c.time, c]));
+
+    return signals.map((signal) => {
+      // entry_price가 이미 있으면 그대로 사용
+      if (signal.entry_price && signal.entry_price > 0) {
+        return signal;
+      }
+
+      // entry_price가 0인 경우 candleData에서 가격 찾기
+      const alignedTime = getCandleStartTime(signal.signal_timestamp, timeframe);
+      const matchingCandle = candleMap.get(alignedTime);
+
+      if (matchingCandle) {
+        return { ...signal, entry_price: matchingCandle.close };
+      }
+
+      return signal;
+    });
+  }, [signals, candleData, timeframe]);
 
   // 필터링된 시그널 (sentiment + influencer)
   const filteredSignals = useMemo(() => {

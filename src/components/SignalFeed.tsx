@@ -30,9 +30,10 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
     });
   };
 
-  // 수익률 계산
-  const calculateReturn = (signal: Signal) => {
+  // 수익률 계산 (entry_price가 0이면 null 반환)
+  const calculateReturn = (signal: Signal): number | null => {
     const entryPrice = signal.entry_price;
+    if (!entryPrice || entryPrice === 0) return null; // 가격 정보 없음
     const priceDiff = currentPrice - entryPrice;
     const returnPct = (priceDiff / entryPrice) * 100;
     const adjustedReturn = signal.sentiment === 'LONG' ? returnPct : -returnPct;
@@ -122,7 +123,8 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
             <ul className="space-y-3" role="list">
               {signals.map((signal) => {
                 const returnPct = calculateReturn(signal);
-                const isProfit = returnPct >= 0;
+                const hasPrice = returnPct !== null;
+                const isProfit = hasPrice && returnPct >= 0;
                 const isHighlighted = highlightedId === signal.id;
                 const isExpanded = expandedIds.has(signal.id);
                 const trustScore = signal.influencer?.trust_score || 0;
@@ -229,22 +231,28 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
                               </time>
                               <span
                                 className="px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-md bg-bg-tertiary/50 font-mono text-fg-tertiary whitespace-nowrap"
-                                aria-label={`진입 가격: ${signal.entry_price.toLocaleString()} 달러`}
+                                aria-label={hasPrice ? `진입 가격: ${signal.entry_price.toLocaleString()} 달러` : '가격 정보 없음'}
                               >
-                                ${signal.entry_price.toLocaleString()}
+                                {hasPrice ? `$${signal.entry_price.toLocaleString()}` : '-'}
                               </span>
-                              <span
-                                className={`ml-auto font-mono font-bold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg whitespace-nowrap ${
-                                  isProfit
-                                    ? 'text-success bg-success/10'
-                                    : 'text-danger bg-danger/10'
-                                }`}
-                                role="status"
-                                aria-label={`현재 수익률: ${isProfit ? '플러스' : '마이너스'} ${Math.abs(returnPct).toFixed(2)}퍼센트`}
-                              >
-                                {isProfit ? '+' : ''}
-                                {returnPct.toFixed(2)}%
-                              </span>
+                              {hasPrice ? (
+                                <span
+                                  className={`ml-auto font-mono font-bold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg whitespace-nowrap ${
+                                    isProfit
+                                      ? 'text-success bg-success/10'
+                                      : 'text-danger bg-danger/10'
+                                  }`}
+                                  role="status"
+                                  aria-label={`현재 수익률: ${isProfit ? '플러스' : '마이너스'} ${Math.abs(returnPct!).toFixed(2)}퍼센트`}
+                                >
+                                  {isProfit ? '+' : ''}
+                                  {returnPct!.toFixed(2)}%
+                                </span>
+                              ) : (
+                                <span className="ml-auto font-mono text-fg-muted px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg whitespace-nowrap bg-bg-tertiary/30">
+                                  -
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
