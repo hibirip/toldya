@@ -6,7 +6,6 @@ import Chart from '@/components/Chart';
 import SignalFeed from '@/components/SignalFeed';
 import { CandleData, FilterType, TimeframeType, Signal } from '@/types';
 import { TickerPrice, fetchBTCCandlesClient } from '@/lib/binance';
-import { getSignalsWithRealPrices } from '@/lib/mockData';
 import { useBinanceWebSocket, RealtimeTicker, RealtimeCandle } from '@/hooks/useBinanceWebSocket';
 
 interface DashboardProps {
@@ -107,15 +106,10 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
     ? parseFloat(currentTicker.price)
     : candleData[candleData.length - 1]?.close || 0;
 
-  // 시그널 데이터: DB 데이터가 있으면 사용, 없으면 Mock 데이터 사용
+  // 시그널 데이터: DB 데이터만 사용 (Mock 데이터 제거)
   const signalsWithRealPrices = useMemo(() => {
-    // DB에서 가져온 실제 데이터가 있으면 사용
-    if (initialSignals.length > 0) {
-      return initialSignals;
-    }
-    // 없으면 Mock 데이터 사용 (개발/테스트용)
-    return getSignalsWithRealPrices(candleData, timeframe);
-  }, [initialSignals, candleData, timeframe]);
+    return initialSignals;
+  }, [initialSignals]);
 
   // 필터링된 시그널
   const filteredSignals = useMemo(() => {
