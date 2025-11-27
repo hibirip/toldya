@@ -29,25 +29,38 @@ export default function Header({ filter, onFilterChange, ticker }: HeaderProps) 
           </span>
         </div>
 
-        {/* 티커 */}
-        <div className="flex-1 overflow-hidden">
-          <div className="flex items-center justify-center sm:justify-center">
-            <div className="flex items-center gap-1.5 sm:gap-3 whitespace-nowrap text-xs sm:text-base">
-              <span className="text-fg-secondary font-medium hidden sm:inline">BTC/USDT</span>
-              <span className="text-fg-primary font-mono font-semibold text-sm sm:text-lg">
-                ${ticker?.price ? Number(ticker.price).toLocaleString() : '---'}
-              </span>
-              <span className={`text-[10px] sm:text-sm font-medium px-1.5 py-0.5 sm:px-2 rounded-md ${
-                isPositive
-                  ? 'text-success bg-success/10'
-                  : 'text-danger bg-danger/10'
-              }`}>
-                {isPositive ? '+' : ''}{ticker?.priceChangePercent || '0.00'}%
-              </span>
-              <span className="text-fg-muted mx-1 sm:mx-2 hidden md:inline">|</span>
-              <span className="text-fg-tertiary text-xs sm:text-sm hidden md:inline">24h Vol</span>
-              <span className="text-fg-primary font-mono text-xs sm:text-base hidden md:inline">${ticker?.volume || '0'}B</span>
-            </div>
+        {/* 티커 - 글래스 카드 스타일 */}
+        <div className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-bg-tertiary/30 border border-border/50">
+          {/* BTC 아이콘 */}
+          <div className="flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#f7931a]/20 flex-shrink-0">
+            <span className="text-[#f7931a] font-bold text-xs sm:text-sm">₿</span>
+          </div>
+
+          {/* 심볼 + 가격 */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="text-fg-secondary font-medium text-[10px] sm:text-xs hidden sm:inline">BTC/USDT</span>
+            <span className="text-fg-primary font-mono font-bold text-sm sm:text-lg">
+              ${ticker?.price ? Number(ticker.price).toLocaleString() : '---'}
+            </span>
+          </div>
+
+          {/* 변동률 배지 */}
+          <div className={`flex items-center gap-0.5 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-md font-medium text-[10px] sm:text-xs ${
+            isPositive
+              ? 'bg-success/15 text-success'
+              : 'bg-danger/15 text-danger'
+          }`}>
+            <span className="text-[8px] sm:text-[10px]">{isPositive ? '▲' : '▼'}</span>
+            <span>{isPositive ? '+' : ''}{ticker?.priceChangePercent || '0.00'}%</span>
+          </div>
+
+          {/* 구분선 */}
+          <div className="hidden md:block w-px h-5 bg-border/50" />
+
+          {/* 24h 거래량 */}
+          <div className="hidden md:flex items-center gap-1">
+            <span className="text-fg-muted text-[10px]">24h</span>
+            <span className="text-fg-secondary font-mono text-xs">${ticker?.volume || '0'}B</span>
           </div>
         </div>
       </div>
