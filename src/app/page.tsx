@@ -16,9 +16,9 @@ async function fetchSignalsSafe() {
 }
 
 export default async function Home() {
-  // 서버에서 데이터 fetch (기본값: 4h)
+  // 서버에서 데이터 fetch (기본값: 1h)
   const [candleData, ticker, signals] = await Promise.all([
-    fetchBTCCandles('4h'),
+    fetchBTCCandles('1h'),
     fetchBTCTicker(),
     fetchSignalsSafe(),
   ]);

@@ -36,12 +36,13 @@ export const TIMEFRAME_LIMITS: Record<TimeframeType, number> = {
 };
 
 // 초기 표시할 캔들 수 (최근 데이터 중심으로 보여줌)
+// -1은 전체 데이터 표시를 의미
 export const INITIAL_VISIBLE_CANDLES: Record<TimeframeType, number> = {
-  '1h': 168,  // 최근 7일
-  '4h': 180,  // 최근 30일
-  '1d': 90,   // 최근 90일
+  '1h': 96,   // 최근 4일 (4 * 24)
+  '4h': 96,   // 최근 16일 (16 * 6)
+  '1d': 60,   // 최근 60일
   '1w': 52,   // 최근 1년
-  '1M': 24,   // 최근 2년
+  '1M': -1,   // 전체 표시
 };
 
 // Binance timestamp(밀리초)를 Unix timestamp(초)로 변환

@@ -17,7 +17,7 @@ interface DashboardProps {
 export default function Dashboard({ initialCandleData, ticker: initialTicker, initialSignals = [] }: DashboardProps) {
   const [filter, setFilter] = useState<FilterType>('ALL');
   const [highlightedSignalId, setHighlightedSignalId] = useState<string | null>(null);
-  const [timeframe, setTimeframe] = useState<TimeframeType>('4h');
+  const [timeframe, setTimeframe] = useState<TimeframeType>('1h');
   const [candleData, setCandleData] = useState<CandleData[]>(initialCandleData);
   const [isLoading, setIsLoading] = useState(false);
   const [realtimeTicker, setRealtimeTicker] = useState<RealtimeTicker | null>(null);

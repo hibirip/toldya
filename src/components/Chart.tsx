@@ -332,10 +332,15 @@ export default function Chart({ candleData, signals, onSignalClick, timeframe, o
       }));
       candlestickSeries.setData(formattedData);
       lastFirstCandleTimeRef.current = currentData[0].time;
-      // 최근 캔들만 보이도록 설정 (전체 fitContent 대신)
+      // 타임프레임별 초기 표시 범위 설정
       const visibleCandles = INITIAL_VISIBLE_CANDLES[timeframeRef.current];
-      const from = Math.max(0, currentData.length - visibleCandles);
-      chart.timeScale().setVisibleLogicalRange({ from, to: currentData.length - 1 });
+      if (visibleCandles === -1) {
+        // 전체 데이터 표시 (1M 타임프레임)
+        chart.timeScale().fitContent();
+      } else {
+        const from = Math.max(0, currentData.length - visibleCandles);
+        chart.timeScale().setVisibleLogicalRange({ from, to: currentData.length - 1 });
+      }
     }
 
     // 리사이즈 핸들러
@@ -413,10 +418,15 @@ export default function Chart({ candleData, signals, onSignalClick, timeframe, o
       }));
       seriesRef.current.setData(formattedData);
       lastFirstCandleTimeRef.current = firstCandleTime;
-      // 최근 캔들만 보이도록 설정 (전체 fitContent 대신)
+      // 타임프레임별 초기 표시 범위 설정
       const visibleCandles = INITIAL_VISIBLE_CANDLES[timeframe];
-      const from = Math.max(0, candleData.length - visibleCandles);
-      chartRef.current?.timeScale().setVisibleLogicalRange({ from, to: candleData.length - 1 });
+      if (visibleCandles === -1) {
+        // 전체 데이터 표시 (1M 타임프레임)
+        chartRef.current?.timeScale().fitContent();
+      } else {
+        const from = Math.max(0, candleData.length - visibleCandles);
+        chartRef.current?.timeScale().setVisibleLogicalRange({ from, to: candleData.length - 1 });
+      }
       // 데이터 로드 후 마커 위치 업데이트
       setTimeout(() => updateMarkerPositions(), 50);
       return;
