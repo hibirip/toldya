@@ -8,7 +8,7 @@ import DragHandle from '@/components/DragHandle';
 import { CandleData, FilterType, TimeframeType, Signal, Influencer } from '@/types';
 import { TickerPrice, fetchBTCCandlesClient } from '@/lib/binance';
 import { useBinanceWebSocket, RealtimeTicker, RealtimeCandle } from '@/hooks/useBinanceWebSocket';
-import { supabaseClient } from '@/lib/supabase-client';
+import { getSupabaseClient } from '@/lib/supabase-client';
 import { getCandleStartTime } from '@/lib/timeUtils';
 
 interface DashboardProps {
@@ -155,7 +155,8 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
 
   // Supabase Realtime 구독 (새 시그널 자동 업데이트)
   useEffect(() => {
-    const channel = supabaseClient
+    const supabase = getSupabaseClient();
+    const channel = supabase
       .channel('signals-realtime')
       .on(
         'postgres_changes',
@@ -164,7 +165,7 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
           console.log('[Realtime] New signal received:', payload.new);
 
           // 인플루언서 정보 가져오기
-          const { data: influencerData } = await supabaseClient
+          const { data: influencerData } = await supabase
             .from('influencers')
             .select('*')
             .eq('id', payload.new.influencer_id)
@@ -198,7 +199,7 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
       .subscribe();
 
     return () => {
-      supabaseClient.removeChannel(channel);
+      supabase.removeChannel(channel);
     };
   }, []);
 
