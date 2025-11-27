@@ -130,24 +130,29 @@ const GROUP_SENTIMENT = [
 const ALL_INFLUENCERS = [...GROUP_MOVERS, ...GROUP_CHARTISTS, ...GROUP_SENTIMENT];
 
 // ============================================
-// Claude 시스템 프롬프트 (BTC Only - 알트코인 필터링 강화)
+// Claude 시스템 프롬프트 (방향성 바이어스 감지 - BTC Only)
 // ============================================
-const CLAUDE_SYSTEM_PROMPT = `너는 가상화폐 트레이딩 전문가다. 트윗 내용을 분석하여 비트코인(BTC)에 대한 포지션을 JSON으로 출력해.
+const CLAUDE_SYSTEM_PROMPT = `You are a crypto sentiment analyst.
+Detect the author's **directional bias** on Bitcoin (BTC only).
 
-⚠️ 중요 규칙:
-- 분석 대상은 오직 **비트코인(BTC)**이다.
-- 트윗이 이더리움(ETH), 솔라나(SOL), 도지(DOGE), XRP 등 **알트코인**에 대한 내용이거나,
-  비트코인에 대한 직접적인 언급/함의가 없다면 무조건 **"NEUTRAL"**로 처리해.
-- "크립토 전체" 또는 "시장 전반"에 대한 언급도 BTC 특정이 아니면 NEUTRAL.
+⚠️ BTC ONLY: If tweet is about altcoins (ETH, SOL, DOGE, etc.) without BTC context → NEUTRAL
 
-{
-  "sentiment": "LONG" | "SHORT" | "NEUTRAL",
-  "confidence": 0~100,
-  "summary": "15자 내외 한글 요약",
-  "target_price": 숫자 또는 null
-}
+**LONG** (Bullish): Expects BTC price UP or positive about BTC
+- "Looks strong", "Support holding", "Accumulating", "Send it"
+- Positive news reaction, dismissing FUD, bullish chart analysis
 
-확실하지 않거나 단순 뉴스면 'NEUTRAL'로 처리해.`;
+**SHORT** (Bearish): Expects BTC price DOWN or cautious/negative
+- "Looks weak", "Taking profits", "Be careful", "Pullback coming"
+- Risk warnings, hedging mentions, bearish chart analysis
+
+**NEUTRAL**: No directional clue or not about BTC
+- Pure noise ("Wow", "Lol"), questions, altcoin-only, unclear
+
+Output JSON only:
+{"sentiment":"LONG"|"SHORT"|"NEUTRAL","confidence":0-100,"summary":"한글 15자 요약"}
+
+Rule: If bias exists but not explicit, still label it (confidence ~70).
+Only NEUTRAL when truly zero directional hint or not BTC-related.`;
 
 // ============================================
 // 클라이언트 초기화

@@ -479,11 +479,14 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
     updateMarkerPositions();
   }, [markerDataList, clusterDataList, updateMarkerPositions]);
 
+  // 시그널 ID 목록 (실제 시그널 변경 감지용)
+  const signalIds = useMemo(() => signals.map(s => s.id).join(','), [signals]);
+
   // 타임프레임/시그널 변경 시 펼쳐진 클러스터 닫기
-  // (실시간 캔들 업데이트에는 영향받지 않도록 candleData 제외)
+  // signalIds를 사용해 실제 시그널 변경만 감지 (배열 참조 변경 무시)
   useEffect(() => {
     setExpandedClusterId(null);
-  }, [timeframe, signals]);
+  }, [timeframe, signalIds]);
 
   // 시그널 선택 시 차트 스크롤
   useEffect(() => {

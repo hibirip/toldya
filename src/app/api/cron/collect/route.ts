@@ -144,18 +144,27 @@ function getGroupName(slot: number): string {
 }
 
 // ============================================
-// Claude 시스템 프롬프트
+// Claude 시스템 프롬프트 (방향성 바이어스 감지)
 // ============================================
-const CLAUDE_SYSTEM_PROMPT = `너는 가상화폐 트레이딩 전문가다. 트윗 내용을 분석하여 비트코인(BTC)에 대한 포지션을 JSON으로 출력해.
+const CLAUDE_SYSTEM_PROMPT = `You are a crypto sentiment analyst.
+Detect the author's **directional bias** on Bitcoin.
 
-{
-  "sentiment": "LONG" | "SHORT" | "NEUTRAL",
-  "confidence": 0~100,
-  "summary": "15자 내외 한글 요약",
-  "target_price": 숫자 또는 null
-}
+**LONG** (Bullish): Expects price UP or positive about BTC
+- "Looks strong", "Support holding", "Accumulating", "Send it"
+- Positive news reaction, dismissing FUD, bullish chart analysis
 
-확실하지 않거나 단순 뉴스면 'NEUTRAL'로 처리해.`;
+**SHORT** (Bearish): Expects price DOWN or cautious/negative
+- "Looks weak", "Taking profits", "Be careful", "Pullback coming"
+- Risk warnings, hedging mentions, bearish chart analysis
+
+**NEUTRAL**: No directional clue
+- Pure noise ("Wow", "Lol"), questions, altcoin-only, unclear
+
+Output JSON only:
+{"sentiment":"LONG"|"SHORT"|"NEUTRAL","confidence":0-100,"summary":"한글 15자 요약"}
+
+Rule: If bias exists but not explicit, still label it (confidence ~70).
+Only NEUTRAL when truly zero directional hint.`;
 
 // ============================================
 // 클라이언트 초기화 (런타임에 생성)
@@ -551,11 +560,18 @@ export async function GET() {
 
         // NEUTRAL 필터링 (DB constraint는 LONG/SHORT만 허용)
         if (analysis.sentiment === 'NEUTRAL') {
-          console.log('[Step B] SKIP: NEUTRAL sentiment (DB only allows LONG/SHORT)');
+          console.log('[Step B] SKIP: NEUTRAL sentiment');
           results.skippedNeutral++;
           continue;
         }
-        console.log(`[Step B] Sentiment: ${analysis.sentiment}`);
+
+        // Low confidence 필터링 (50 미만은 신뢰도 부족)
+        if (analysis.confidence < 50) {
+          console.log(`[Step B] SKIP: Low confidence (${analysis.confidence})`);
+          results.skippedNeutral++;
+          continue;
+        }
+        console.log(`[Step B] Sentiment: ${analysis.sentiment}, Confidence: ${analysis.confidence}`);
 
         // ========== 동일인 중복 체크 (같은 sentiment + 24시간 내) ==========
         if (recentSentiments.has(analysis.sentiment)) {
