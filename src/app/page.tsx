@@ -2,6 +2,9 @@ import Dashboard from '@/components/Dashboard';
 import { fetchBTCCandles, fetchBTCTicker } from '@/lib/binance';
 import { fetchSignalsForFrontend } from '@/lib/supabase';
 
+// 빌드 타임에 정적 생성하지 않고 런타임에 동적 렌더링
+export const dynamic = 'force-dynamic';
+
 // Supabase 시그널 fetch (에러 시 빈 배열 반환)
 async function fetchSignalsSafe() {
   try {

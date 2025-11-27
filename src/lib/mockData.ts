@@ -506,6 +506,11 @@ export function getSignalsWithRealPrices(
   candleData: CandleData[],
   timeframe: TimeframeType
 ): Signal[] {
+  // 캔들 데이터가 없으면 원본 시그널 반환
+  if (!candleData || candleData.length === 0) {
+    return signalsWithInfluencer;
+  }
+
   // O(1) 조회를 위한 캔들 Map
   const candleMap = new Map(candleData.map((c) => [c.time, c]));
 
@@ -524,6 +529,12 @@ export function getSignalsWithRealPrices(
 
     // 캔들이 없으면 가장 가까운 캔들 찾기
     const candleTimes = Array.from(candleMap.keys()).sort((a, b) => a - b);
+
+    // 캔들 시간 배열이 비어있으면 원본 entry_price 사용
+    if (candleTimes.length === 0) {
+      return signal;
+    }
+
     const closestTime = candleTimes.reduce((prev, curr) =>
       Math.abs(curr - alignedTime) < Math.abs(prev - alignedTime) ? curr : prev
     );
