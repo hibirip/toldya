@@ -21,8 +21,12 @@ export default function Header({ filter, onFilterChange, ticker }: HeaderProps) 
       <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
         {/* 로고 */}
         <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-          <span className="text-point text-lg sm:text-2xl font-bold tracking-tight">박제소</span>
-          <span className="text-fg-tertiary text-[10px] sm:text-xs hidden sm:inline">Signal Overlay</span>
+          <span
+            className="text-point text-xs sm:text-base tracking-tight"
+            style={{ fontFamily: 'var(--font-pixel)' }}
+          >
+            Toldya
+          </span>
         </div>
 
         {/* 티커 */}
