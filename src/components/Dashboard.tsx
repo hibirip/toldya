@@ -126,7 +126,7 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <Header filter={filter} onFilterChange={setFilter} ticker={currentTicker} />
+      <Header ticker={currentTicker} />
 
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
         {/* 차트 영역 */}
@@ -147,6 +147,8 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
             signals={filteredSignals}
             highlightedId={highlightedSignalId}
             currentPrice={currentPrice}
+            filter={filter}
+            onFilterChange={setFilter}
           />
         </aside>
       </main>

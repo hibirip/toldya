@@ -1,17 +1,13 @@
 'use client';
 
-import { FilterType } from '@/types';
 import { TickerPrice } from '@/lib/binance';
 import { useTheme } from '@/hooks/useTheme';
 
 interface HeaderProps {
-  filter: FilterType;
-  onFilterChange: (filter: FilterType) => void;
   ticker: TickerPrice | null;
 }
 
-export default function Header({ filter, onFilterChange, ticker }: HeaderProps) {
-  const filters: FilterType[] = ['ALL', 'LONG', 'SHORT'];
+export default function Header({ ticker }: HeaderProps) {
   const isPositive = ticker ? parseFloat(ticker.priceChangePercent) >= 0 : true;
   const { theme, toggleTheme, mounted } = useTheme();
 
@@ -65,30 +61,8 @@ export default function Header({ filter, onFilterChange, ticker }: HeaderProps) 
         </div>
       </div>
 
-      {/* 필터 버튼 + 테마 토글 */}
-      <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-        {/* 필터 버튼 */}
-        <div className="flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 rounded-lg sm:rounded-xl bg-bg-tertiary/50">
-          {filters.map((f) => (
-            <button
-              key={f}
-              onClick={() => onFilterChange(f)}
-              className={`px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-sm font-medium rounded-md sm:rounded-lg transition-all duration-200 ${
-                filter === f
-                  ? f === 'LONG'
-                    ? 'bg-success/20 text-success shadow-sm'
-                    : f === 'SHORT'
-                    ? 'bg-danger/20 text-danger shadow-sm'
-                    : 'bg-point/20 text-point shadow-sm'
-                  : 'text-fg-secondary hover:text-fg-primary hover:bg-bg-secondary/80'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-
-        {/* 테마 토글 */}
+      {/* 테마 토글 */}
+      <div className="flex items-center flex-shrink-0">
         <button
           onClick={toggleTheme}
           className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl text-fg-secondary hover:text-fg-primary hover:bg-bg-tertiary/80 transition-all duration-200"

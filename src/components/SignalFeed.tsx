@@ -1,16 +1,19 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import { Signal } from '@/types';
+import { Signal, FilterType } from '@/types';
 import { toDisplayFormat } from '@/lib/timeUtils';
 
 interface SignalFeedProps {
   signals: Signal[];
   highlightedId: string | null;
   currentPrice: number;
+  filter: FilterType;
+  onFilterChange: (filter: FilterType) => void;
 }
 
-export default function SignalFeed({ signals, highlightedId, currentPrice }: SignalFeedProps) {
+export default function SignalFeed({ signals, highlightedId, currentPrice, filter, onFilterChange }: SignalFeedProps) {
+  const filters: FilterType[] = ['ALL', 'LONG', 'SHORT'];
   const itemRefs = useRef<{ [key: string]: HTMLElement | null }>({});
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
@@ -71,15 +74,38 @@ export default function SignalFeed({ signals, highlightedId, currentPrice }: Sig
     >
       <div className="p-3 sm:p-4">
         <header className="mb-3 sm:mb-4">
-          <h2 className="text-base sm:text-lg font-semibold text-fg-primary flex items-center gap-2">
-            <span className="text-point">Signal Feed</span>
-            <span
-              className="text-fg-tertiary text-xs sm:text-sm font-normal px-1.5 sm:px-2 py-0.5 rounded-full bg-bg-tertiary/80"
-              aria-label={`총 ${signals.length}개의 시그널`}
-            >
-              {signals.length}
-            </span>
-          </h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-base sm:text-lg font-semibold text-fg-primary flex items-center gap-2">
+              <span className="text-point">Signal Feed</span>
+              <span
+                className="text-fg-tertiary text-xs sm:text-sm font-normal px-1.5 sm:px-2 py-0.5 rounded-full bg-bg-tertiary/80"
+                aria-label={`총 ${signals.length}개의 시그널`}
+              >
+                {signals.length}
+              </span>
+            </h2>
+
+            {/* 필터 버튼 */}
+            <div className="flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 rounded-lg sm:rounded-xl bg-bg-tertiary/50">
+              {filters.map((f) => (
+                <button
+                  key={f}
+                  onClick={() => onFilterChange(f)}
+                  className={`px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-sm font-medium rounded-md sm:rounded-lg transition-all duration-200 ${
+                    filter === f
+                      ? f === 'LONG'
+                        ? 'bg-success/20 text-success shadow-sm'
+                        : f === 'SHORT'
+                        ? 'bg-danger/20 text-danger shadow-sm'
+                        : 'bg-point/20 text-point shadow-sm'
+                      : 'text-fg-secondary hover:text-fg-primary hover:bg-bg-secondary/80'
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
         </header>
 
         <ul className="space-y-2 sm:space-y-3" role="list">
