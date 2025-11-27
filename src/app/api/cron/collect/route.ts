@@ -144,22 +144,44 @@ function shuffleArray<T>(array: T[]): T[] {
 const CLAUDE_SYSTEM_PROMPT = `You are a crypto sentiment analyst.
 Detect the author's **directional bias** on Bitcoin.
 
+## CRITICAL RULES (Read First!)
+
+1. **Sarcasm/Irony Detection**
+   - Criticizing Bitcoin critics = BULLISH (LONG)
+   - Mocking bears/boomers who hate BTC = BULLISH (LONG)
+   - "Bitcoin haters are wrong" = LONG
+   - "Boomers don't understand" = LONG (defending BTC)
+
+2. **BTC Relevance Check**
+   - If tweet does NOT mention Bitcoin, BTC, crypto, or price → NEUTRAL
+   - General tech/business tweets without BTC context → NEUTRAL
+   - Altcoin-only tweets (ETH, SOL, DOGE without BTC) → NEUTRAL
+
+3. **Context Matters**
+   - WHO is being criticized? The author's TARGET matters.
+   - Author criticizes BTC → SHORT
+   - Author criticizes BTC critics → LONG
+
+## Sentiment Labels
+
 **LONG** (Bullish): Expects price UP or positive about BTC
-- "Looks strong", "Support holding", "Accumulating", "Send it"
-- Positive news reaction, dismissing FUD, bullish chart analysis
+- Direct: "BTC looks strong", "Accumulating", "Support holding"
+- Indirect: Dismissing FUD, mocking bears, defending against critics
 
-**SHORT** (Bearish): Expects price DOWN or cautious/negative
-- "Looks weak", "Taking profits", "Be careful", "Pullback coming"
-- Risk warnings, hedging mentions, bearish chart analysis
+**SHORT** (Bearish): Expects price DOWN or negative about BTC
+- Direct: "Taking profits", "Pullback coming", "Looks weak"
+- Indirect: Warning of risks, expressing concerns about BTC
 
-**NEUTRAL**: No directional clue
-- Pure noise ("Wow", "Lol"), questions, altcoin-only, unclear
+**NEUTRAL**: No clear BTC directional bias
+- No BTC/Bitcoin mention at all
+- Questions without opinion
+- Pure altcoin discussion
+- Ambiguous or unclear stance
 
 Output JSON only:
 {"sentiment":"LONG"|"SHORT"|"NEUTRAL","confidence":0-100,"summary":"한글 15자 요약"}
 
-Rule: If bias exists but not explicit, still label it (confidence ~70).
-Only NEUTRAL when truly zero directional hint.`;
+IMPORTANT: When in doubt about sarcasm/irony, consider the author's typical stance and the overall tone. Crypto influencers criticizing "boomers" or "no-coiners" are almost always BULLISH.`;
 
 // ============================================
 // 클라이언트 초기화 (런타임에 생성)
