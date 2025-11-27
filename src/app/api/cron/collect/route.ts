@@ -101,46 +101,41 @@ const TWITTER_COOKIES = [
 ];
 
 // ============================================
-// 인플루언서 그룹 (50인, 2분할 - Vercel 무료 플랜 Cron 제한)
+// 인플루언서 풀 (100명 - 랜덤 셔플 방식)
 // ============================================
-
-// GROUP_A (25명) - MOVERS + CHARTISTS 일부
-const GROUP_A = [
-  // MOVERS (10명)
-  'elonmusk', 'saylor', 'jack', 'maxkeiser', 'Adam3us',
-  'CryptoHayes', 'cz_binance', 'excellion', 'jackmallers', 'pierre_rochard',
-  // CHARTISTS 일부 (15명)
-  'PeterLBrandt', 'crediblecrypto', 'pentosh1', 'TheCryptoDog', 'StockmoneyL',
-  'MerlijnTrader', 'ColinTCrypto', 'ave_eli', 'Banana3Stocks', 'TATrader_Alan',
-  'ClaireJensen_', 'CryptoPatel', 'EzyBitcoin', 'Anbessa100', 'realwizard101'
-];
-
-// GROUP_B (25명) - CHARTISTS 나머지 + SENTIMENT
-const GROUP_B = [
-  // CHARTISTS 나머지 (10명)
-  'catruffles', 'mckitrick_mark', 'QuidMiner', 'cryptotitans11', 'BtcDose',
+const INFLUENCER_POOL = [
+  // MOVERS (9명)
+  'elonmusk', 'saylor', 'jack', 'maxkeiser', 'Adam3us', 'CryptoHayes', 'excellion', 'jackmallers', 'pierre_rochard',
+  // CHARTISTS (25명)
+  'PeterLBrandt', 'crediblecrypto', 'pentosh1', 'TheCryptoDog', 'StockmoneyL', 'MerlijnTrader', 'ColinTCrypto', 'ave_eli', 'Banana3Stocks', 'TATrader_Alan',
+  'ClaireJensen_', 'CryptoPatel', 'EzyBitcoin', 'Anbessa100', 'realwizard101', 'catruffles', 'mckitrick_mark', 'QuidMiner', 'cryptotitans11', 'BtcDose',
   'COINEO963', 'leebeard73', 'noneisahero', 'Beyoglu124', 'canearnstrategy',
-  // SENTIMENT (15명)
-  'CryptoCapo_', '100trillionUSD', 'rektcapital', 'santimentfeed', 'jasonpizzino',
-  'misterrcrypto', 'TheDustyBC', 'hiRavenCrypto', 'kyledoops', 'trade_centurion',
-  'xiaweb3', 'ChainGPTAI', 'Sober_Trading', 'CloudAction', 'FFC03Josh'
-];
+  // SENTIMENT (16명)
+  'CryptoCapo_', '100trillionUSD', 'rektcapital', 'santimentfeed', 'jasonpizzino', 'misterrcrypto', 'TheDustyBC', 'hiRavenCrypto', 'kyledoops', 'trade_centurion',
+  'xiaweb3', 'ChainGPTAI', 'Sober_Trading', 'CloudAction', 'FFC03Josh',
+  // TRADERS (10명)
+  'scottmelker', 'ToneVays', 'CryptoKaleo', 'CryptoDonAlt', 'crypto_birb', 'TheMoonCarl', 'CarpeNoctom', 'KoroushAK', 'RealCryptoFace1', 'Sheldon_Sniper',
+  // ANALYSTS (10명)
+  'MMCrypto', 'inversebrah', 'CryptoCred', 'woonomic', 'filbfilb', 'LynAldenContact', 'PrestonPysh', 'RaoulGMI', 'DTAPCAP', 'nic_carter',
+  // MACRO (10명)
+  'saifedean', 'MarkYusko', 'cburniske', 'danheld', 'APompliano', 'Travis_Kling', 'aantonop', 'natbrunell', 'gladstein', 'ErikVoorhees',
+  // NEWS/DATA (6명)
+  'tier10k', 'DocumentingBTC', 'whale_alert', 'BitcoinMagazine', 'WatcherGuru', 'DecryptMedia',
+  // BUILDERS (14명)
+  'balajis', 'MartyBent', 'lopp', 'pete_rizzo_', 'giacomozucco', 'simplybitcoinTV', 'lookonchain', 'whalepanda', 'IncomeSharks', 'WuBlockchain',
+  'MessariCrypto', 'WClementeIII', 'DylanLeClair', 'CharlesEdwards',
+  // INFLUENCERS (10명)
+  'CathieDWood', 'stephanlivera', 'matt_odell', 'Swan', 'MustStopMurad', 'TraderMercury', 'WOLF_Financial', 'ChrisUniverseB', 'apixtwts', 'Luke360',
+]; // 총 100명
 
-// 시간대별 그룹 선택 (12시간 간격, 하루 2회)
-function getCurrentGroup(): string[] {
-  const hour = new Date().getUTCHours();
-  // 12시간 단위로 그룹 분할
-  if (hour < 12) return GROUP_A;  // 00:00-11:59 UTC
-  return GROUP_B;                  // 12:00-23:59 UTC
-}
-
-function getGroupSlot(): number {
-  const hour = new Date().getUTCHours();
-  return hour < 12 ? 0 : 1;
-}
-
-function getGroupName(slot: number): string {
-  return ['GROUP_A', 'GROUP_B'][slot] || 'UNKNOWN';
+// Fisher-Yates 셔플 알고리즘
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }
 
 // ============================================
@@ -375,22 +370,20 @@ export async function GET() {
     console.log('========================================');
     console.log('[Step A] Starting Apify crawl...');
 
-    // 현재 시간대 그룹 선택
-    const hour = new Date().getUTCHours();
-    const slot = getGroupSlot();
-    const currentGroup = getCurrentGroup();
-    const groupName = getGroupName(slot);
+    // 랜덤 셔플 후 40명 선택
+    const shuffled = shuffleArray(INFLUENCER_POOL);
+    const targets = shuffled.slice(0, 40);
 
-    console.log(`[Group] UTC Hour: ${hour}, Slot: ${slot}, Group: ${groupName}`);
-    console.log(`[Group] Influencers (${currentGroup.length}): ${currentGroup.slice(0, 5).join(', ')}...`);
+    console.log(`[Shuffle] Pool size: ${INFLUENCER_POOL.length}, Targets: ${targets.length}`);
+    console.log(`[Shuffle] Selected: ${targets.slice(0, 10).join(', ')}...`);
 
     // 검색 쿼리 동적 생성
-    const searchQuery = `(${currentGroup.map(h => `from:${h}`).join(' OR ')}) AND (Bitcoin OR BTC OR Price OR Long OR Short)`;
-    console.log('[Step A] Search query:', searchQuery);
+    const searchQuery = `(${targets.map((h: string) => `from:${h}`).join(' OR ')}) AND (Bitcoin OR BTC OR Price OR Long OR Short)`;
+    console.log('[Step A] Search query length:', searchQuery.length);
 
     const run = await apifyClient.actor('apidojo/tweet-scraper').call({
       searchTerms: [searchQuery],
-      maxItems: 20,
+      maxItems: 50,
       sort: 'Latest',
       tweetLanguage: 'en',
       cookies: TWITTER_COOKIES.length > 0 ? TWITTER_COOKIES : undefined,
