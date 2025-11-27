@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import Header from '@/components/Header';
 import Chart from '@/components/Chart';
 import SignalFeed from '@/components/SignalFeed';
@@ -74,6 +74,15 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
       setIsLoading(false);
     }
   }, []);
+
+  // 서버에서 데이터를 못 가져온 경우 클라이언트에서 재시도
+  // (Vercel 서버에서 Binance API 차단 시 대응)
+  useEffect(() => {
+    if (initialCandleData.length === 0 && candleData.length === 0 && !isLoading) {
+      console.log('[Dashboard] Server data empty, fetching from client...');
+      fetchCandleData(timeframe);
+    }
+  }, [initialCandleData.length, candleData.length, isLoading, fetchCandleData, timeframe]);
 
   // 타임프레임 변경 핸들러
   const handleTimeframeChange = useCallback((tf: TimeframeType) => {
