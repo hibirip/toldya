@@ -65,6 +65,16 @@ export default function SignalFeed({ signals, highlightedId, currentPrice, filte
     }
   }, [highlightedId]);
 
+  // signals 변경 시 사라진 항목의 refs 정리 (메모리 누수 방지)
+  useEffect(() => {
+    const currentIds = new Set(signals.map(s => s.id));
+    Object.keys(itemRefs.current).forEach(id => {
+      if (!currentIds.has(id)) {
+        delete itemRefs.current[id];
+      }
+    });
+  }, [signals]);
+
   return (
     <section
       className="h-full flex flex-col bg-bg-primary/50 min-w-[280px]"

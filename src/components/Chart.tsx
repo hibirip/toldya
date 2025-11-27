@@ -450,6 +450,11 @@ export default function Chart({ candleData, signals, onSignalClick, timeframe, o
     updateMarkerPositions();
   }, [markerDataList, clusterDataList, updateMarkerPositions]);
 
+  // 클러스터 데이터 변경 시 펼쳐진 클러스터 닫기
+  useEffect(() => {
+    setExpandedClusterId(null);
+  }, [clusterDataList]);
+
   return (
     <div className="relative w-full h-full min-h-[250px] sm:min-h-[300px] md:min-h-[400px] overflow-hidden">
       <div ref={containerRef} className="w-full h-full" />
@@ -580,17 +585,23 @@ export default function Chart({ candleData, signals, onSignalClick, timeframe, o
       })}
 
       {/* 펼쳐진 클러스터 */}
-      {expandedClusterId && (
-        <ExpandedCluster
-          cluster={markerClusters.find((c) => c.id === expandedClusterId)!}
-          onClose={() => setExpandedClusterId(null)}
-          onSignalClick={(signalId) => {
-            onSignalClick?.(signalId);
-            setExpandedClusterId(null);
-          }}
-          containerBounds={containerRef.current?.getBoundingClientRect()}
-        />
-      )}
+      {(() => {
+        const expandedCluster = expandedClusterId
+          ? markerClusters.find((c) => c.id === expandedClusterId)
+          : null;
+        if (!expandedCluster) return null;
+        return (
+          <ExpandedCluster
+            cluster={expandedCluster}
+            onClose={() => setExpandedClusterId(null)}
+            onSignalClick={(signalId) => {
+              onSignalClick?.(signalId);
+              setExpandedClusterId(null);
+            }}
+            containerBounds={containerRef.current?.getBoundingClientRect()}
+          />
+        );
+      })()}
 
       {/* X 스타일 툴팁 - 모바일에서는 숨김 */}
       {tooltip.visible && tooltip.signal && (

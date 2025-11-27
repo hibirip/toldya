@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
 import Chart from '@/components/Chart';
 import SidePanel from '@/components/SidePanel';
@@ -22,6 +22,9 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
   const [isLoading, setIsLoading] = useState(false);
   const [realtimeTicker, setRealtimeTicker] = useState<RealtimeTicker | null>(null);
   const [selectedInfluencerId, setSelectedInfluencerId] = useState<string | null>(null);
+
+  // 하이라이트 타이머 ref (메모리 누수 방지)
+  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // REST 데이터의 마지막 캔들 시간
   const lastCandleTime = candleData.length > 0 ? candleData[candleData.length - 1].time : undefined;
@@ -129,12 +132,27 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
     return result;
   }, [filter, signalsWithRealPrices, selectedInfluencerId]);
 
-  // 차트에서 시그널 클릭 시
-  const handleSignalClick = (signalId: string) => {
+  // 차트에서 시그널 클릭 시 (타이머 정리로 메모리 누수 방지)
+  const handleSignalClick = useCallback((signalId: string) => {
+    // 이전 타이머 정리
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current);
+    }
     setHighlightedSignalId(signalId);
     // 3초 후 하이라이트 해제
-    setTimeout(() => setHighlightedSignalId(null), 3000);
-  };
+    highlightTimeoutRef.current = setTimeout(() => {
+      setHighlightedSignalId(null);
+    }, 3000);
+  }, []);
+
+  // 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">

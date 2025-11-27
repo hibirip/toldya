@@ -57,8 +57,22 @@ export function useBinanceWebSocket({
   }, [lastCandleTime]);
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
+    // OPEN 또는 CONNECTING 상태면 중복 연결 방지
+    if (wsRef.current?.readyState === WebSocket.OPEN ||
+        wsRef.current?.readyState === WebSocket.CONNECTING) {
       return;
+    }
+
+    // 이전 연결이 있다면 명시적으로 정리
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    // 재연결 타이머도 정리
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
     }
 
     // 스트림 구성: 캔들 + 24시간 티커
