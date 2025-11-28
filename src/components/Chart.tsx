@@ -9,6 +9,11 @@ import { useTheme } from '@/hooks/useTheme';
 import StackedMarker from './StackedMarker';
 import ExpandedCluster from './ExpandedCluster';
 
+// 타임존 오프셋 (초 단위) - UTC를 로컬 시간으로 변환
+// getTimezoneOffset()은 분 단위, UTC+9(KST)면 -540 반환
+// 로컬 시간 = UTC - offset, 즉 UTC + 540분 = UTC + 9시간
+const getTimezoneOffsetSeconds = () => -new Date().getTimezoneOffset() * 60;
+
 // 마커 데이터 (DOM 조작용)
 interface MarkerData {
   signal: Signal;
@@ -146,12 +151,14 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
     const candleMap = new Map(currentCandleData.map((c) => [c.time, c]));
 
     const validMarkers: MarkerData[] = [];
+    const tzOffset = getTimezoneOffsetSeconds();
 
     signals.forEach((signal) => {
-      const alignedTime = getCandleStartTime(signal.signal_timestamp, currentTimeframe);
-      const matchingCandle = candleMap.get(alignedTime);
+      const alignedTimeUTC = getCandleStartTime(signal.signal_timestamp, currentTimeframe);
+      const matchingCandle = candleMap.get(alignedTimeUTC);
       if (matchingCandle) {
-        validMarkers.push({ signal, alignedTime, candlePrice: matchingCandle.close });
+        // alignedTime에 타임존 오프셋 적용 (차트 데이터와 일치하도록)
+        validMarkers.push({ signal, alignedTime: alignedTimeUTC + tzOffset, candlePrice: matchingCandle.close });
       }
     });
 
@@ -177,26 +184,26 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
       // standalone 마커 데이터 + 가시 영역 밖 마커
       const standaloneMarkers: MarkerData[] = [
         ...standalone.map((pos) => {
-          const alignedTime = getCandleStartTime(pos.signal.signal_timestamp, currentTimeframe);
-          const candle = candleMap.get(alignedTime);
+          const alignedTimeUTC = getCandleStartTime(pos.signal.signal_timestamp, currentTimeframe);
+          const candle = candleMap.get(alignedTimeUTC);
           return {
             signal: pos.signal,
-            alignedTime,
+            alignedTime: alignedTimeUTC + tzOffset, // 타임존 오프셋 적용
             candlePrice: candle?.close ?? pos.signal.entry_price, // fallback to entry_price
           };
         }),
-        ...outsideMarkers, // 가시 영역 밖 마커도 포함 (이미 candlePrice 있음)
+        ...outsideMarkers, // 가시 영역 밖 마커도 포함 (이미 candlePrice, alignedTime에 오프셋 적용됨)
       ];
 
       // 클러스터 데이터 (MarkerCluster의 signals 사용)
       const clusterData: ClusterData[] = clusters.map((cluster) => ({
         id: cluster.id,
         markers: cluster.signals.map((signal) => {
-          const alignedTime = getCandleStartTime(signal.signal_timestamp, currentTimeframe);
-          const candle = candleMap.get(alignedTime);
+          const alignedTimeUTC = getCandleStartTime(signal.signal_timestamp, currentTimeframe);
+          const candle = candleMap.get(alignedTimeUTC);
           return {
             signal,
-            alignedTime,
+            alignedTime: alignedTimeUTC + tzOffset, // 타임존 오프셋 적용
             candlePrice: candle?.close ?? signal.entry_price, // fallback to entry_price
           };
         }),
@@ -329,13 +336,7 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
         ...chartTheme.timeScale,
         timeVisible: true,
       },
-      localization: {
-        // 사용자 로컬 타임존으로 시간 표시
-        timeFormatter: (timestamp: number) => {
-          const date = new Date(timestamp * 1000);
-          return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-        },
-      },
+      // timeFormatter 제거 - 타임스탬프 자체를 로컬 시간으로 오프셋하여 X축과 크로스헤어 일관성 유지
     });
 
     chartRef.current = chart;
@@ -445,8 +446,10 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
 
     // 데이터 세트가 변경된 경우 (타임프레임 변경 등) - 전체 재설정
     if (lastFirstCandleTimeRef.current !== firstCandleTime) {
+      // 타임존 오프셋 적용 - UTC → 로컬 시간으로 변환하여 X축/크로스헤어 일관성 유지
+      const tzOffset = getTimezoneOffsetSeconds();
       const formattedData: CandlestickData[] = candleData.map((d) => ({
-        time: d.time as Time,
+        time: (d.time + tzOffset) as Time,
         open: d.open,
         high: d.high,
         low: d.low,
@@ -469,9 +472,10 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
     }
 
     // 실시간 업데이트: 마지막 캔들만 업데이트
+    const tzOffset = getTimezoneOffsetSeconds();
     const lastCandle = candleData[candleData.length - 1];
     const formattedCandle: CandlestickData = {
-      time: lastCandle.time as Time,
+      time: (lastCandle.time + tzOffset) as Time,
       open: lastCandle.open,
       high: lastCandle.high,
       low: lastCandle.low,
