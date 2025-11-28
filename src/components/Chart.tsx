@@ -99,6 +99,7 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
   // 마커/클러스터 DOM refs (직접 DOM 조작용)
   const markerRefsMap = useRef<Map<string, HTMLDivElement>>(new Map());
   const clusterRefsMap = useRef<Map<string, HTMLDivElement>>(new Map());
+  const popoutMarkerRef = useRef<HTMLDivElement | null>(null);
 
   // 마커 데이터 (시그널 변경 시에만 업데이트) - state와 ref 둘 다 유지
   const [markerDataList, setMarkerDataList] = useState<MarkerData[]>([]);
@@ -282,6 +283,34 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
         element.style.transform = `translate(${centerX}px, ${centerY}px) translate(-50%, -50%)`;
       }
     });
+
+    // 팝아웃 마커 위치 업데이트
+    if (popoutMarkerRef.current) {
+      // 클러스터에서 선택된 마커 찾기
+      let foundMarker: MarkerData | null = null;
+      for (const cluster of currentClusterDataList) {
+        const marker = cluster.markers.find((m) => m.signal.id === popoutMarkerRef.current?.dataset.signalId);
+        if (marker) {
+          foundMarker = marker;
+          break;
+        }
+      }
+
+      if (foundMarker) {
+        const x = timeScale.timeToCoordinate(foundMarker.alignedTime as Time);
+        const y = series.priceToCoordinate(foundMarker.candlePrice);
+
+        if (x === null || y === null) {
+          popoutMarkerRef.current.style.visibility = 'hidden';
+        } else {
+          popoutMarkerRef.current.style.visibility = 'visible';
+          const topOffset = foundMarker.signal.sentiment === 'LONG' ? y + 3 : y - 38;
+          popoutMarkerRef.current.style.transform = `translate(${x}px, ${topOffset}px) translateX(-50%)`;
+        }
+      } else {
+        popoutMarkerRef.current.style.visibility = 'hidden';
+      }
+    }
   }, []); // 의존성 없음 - ref 사용
 
   // 클러스터 데이터를 MarkerCluster 형식으로 변환 (StackedMarker/ExpandedCluster용)
@@ -320,6 +349,20 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
       };
     });
   }, [clusterDataList]);
+
+  // 클러스터 내 선택된 마커 찾기 (팝아웃용)
+  const popoutMarkerData = useMemo((): MarkerData | null => {
+    if (!selectedSignalId) return null;
+
+    // 클러스터 데이터에서 선택된 시그널 찾기
+    for (const cluster of clusterDataList) {
+      const marker = cluster.markers.find((m) => m.signal.id === selectedSignalId);
+      if (marker) {
+        return marker;
+      }
+    }
+    return null;
+  }, [selectedSignalId, clusterDataList]);
 
   // 차트 초기화 (테마 변경 시에만 재생성)
   useEffect(() => {
@@ -493,6 +536,14 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
   useEffect(() => {
     updateMarkerPositions();
   }, [markerDataList, clusterDataList, updateMarkerPositions]);
+
+  // 팝아웃 마커 변경 시 위치 업데이트
+  useEffect(() => {
+    if (popoutMarkerData) {
+      // 다음 프레임에 위치 업데이트 (DOM 렌더링 후)
+      requestAnimationFrame(() => updateMarkerPositions());
+    }
+  }, [popoutMarkerData, updateMarkerPositions]);
 
   // 시그널 ID 목록 (실제 시그널 변경 감지용)
   const signalIds = useMemo(() => signals.map(s => s.id).join(','), [signals]);
@@ -669,6 +720,65 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
           </div>
         );
       })}
+
+      {/* 클러스터 내 선택된 마커 팝아웃 */}
+      {popoutMarkerData && (
+        <div
+          ref={popoutMarkerRef}
+          data-signal-id={popoutMarkerData.signal.id}
+          className="absolute left-0 top-0 pointer-events-none z-50"
+          style={{
+            willChange: 'transform, visibility',
+            visibility: 'hidden',
+          }}
+        >
+          <div
+            className="flex flex-col items-center pointer-events-auto cursor-pointer marker-popout"
+            onClick={() => onSignalClick?.(popoutMarkerData.signal.id)}
+            onMouseEnter={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const containerRect = containerRef.current?.getBoundingClientRect();
+              if (containerRect) {
+                const x = rect.left - containerRect.left + rect.width / 2;
+                const y = rect.top - containerRect.top;
+                setTooltip({
+                  visible: true,
+                  x,
+                  y: popoutMarkerData.signal.sentiment === 'LONG' ? y + 50 : y,
+                  signal: popoutMarkerData.signal,
+                  candlePrice: popoutMarkerData.candlePrice,
+                });
+              }
+            }}
+            onMouseLeave={() => setTooltip((prev) => ({ ...prev, visible: false }))}
+          >
+            {/* SHORT: 화살표가 위, 프로필이 아래 */}
+            {popoutMarkerData.signal.sentiment === 'SHORT' && (
+              <div className="text-danger text-xl sm:text-2xl leading-none drop-shadow-glow-danger">▼</div>
+            )}
+
+            {/* 프로필 이미지 */}
+            <div
+              className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 overflow-hidden bg-bg-secondary ring-4 ${
+                popoutMarkerData.signal.sentiment === 'LONG'
+                  ? 'border-success ring-success/30'
+                  : 'border-danger ring-danger/30'
+              }`}
+            >
+              <img
+                src={popoutMarkerData.signal.influencer?.avatar_url}
+                alt={popoutMarkerData.signal.influencer?.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            {/* LONG: 프로필이 위, 화살표가 아래 */}
+            {popoutMarkerData.signal.sentiment === 'LONG' && (
+              <div className="text-success text-xl sm:text-2xl leading-none drop-shadow-glow-success">▲</div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 펼쳐진 클러스터 */}
       {(() => {

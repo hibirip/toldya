@@ -698,3 +698,28 @@ body {
 .popup-fade-in {
   animation: popupFadeIn 150ms ease-out forwards;
 }
+
+/* 팝아웃 마커 (클러스터에서 선택된 마커) */
+.marker-popout {
+  animation: markerPopout 200ms ease-out forwards;
+}
+
+@keyframes markerPopout {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 글로우 효과 (drop-shadow) */
+.drop-shadow-glow-success {
+  filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.8)) drop-shadow(0 0 16px rgba(16, 185, 129, 0.4));
+}
+
+.drop-shadow-glow-danger {
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.8)) drop-shadow(0 0 16px rgba(239, 68, 68, 0.4));
+}
