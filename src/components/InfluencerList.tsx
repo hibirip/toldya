@@ -183,9 +183,17 @@ export default function InfluencerList({ onInfluencerSelect, selectedInfluencerI
 
             return (
               <li key={influencer.id}>
-                <button
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => onInfluencerSelect(isSelected ? null : influencer.id)}
-                  className={`w-full p-3 rounded-xl transition-all text-left ${
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onInfluencerSelect(isSelected ? null : influencer.id);
+                    }
+                  }}
+                  className={`w-full p-3 rounded-xl transition-all text-left cursor-pointer ${
                     isSelected
                       ? 'glass-card-highlight ring-2 ring-point/50'
                       : 'glass-card hover-lift'
@@ -267,7 +275,7 @@ export default function InfluencerList({ onInfluencerSelect, selectedInfluencerI
                       </svg>
                     </button>
                   </div>
-                </button>
+                </div>
               </li>
             );
           })}

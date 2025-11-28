@@ -682,3 +682,19 @@ body {
 .cluster-pulse {
   animation: clusterPulse 2s infinite;
 }
+
+/* 팝업 페이드인 애니메이션 */
+@keyframes popupFadeIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.popup-fade-in {
+  animation: popupFadeIn 150ms ease-out forwards;
+}

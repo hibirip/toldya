@@ -94,33 +94,6 @@ function processCluster(
 }
 
 /**
- * 펼쳐진 클러스터의 각 시그널 위치 계산 (원형 배치)
- */
-export function calculateExpandedPositions(
-  cluster: MarkerCluster,
-  radius: number = 50
-): { signal: Signal; x: number; y: number; angle: number }[] {
-  const { signals, x: centerX, y: centerY } = cluster;
-  const count = signals.length;
-
-  // 시작 각도를 -90도(위쪽)로 설정
-  const startAngle = -90;
-  const angleStep = 360 / count;
-
-  return signals.map((signal, index) => {
-    const angleDeg = startAngle + (index * angleStep);
-    const angleRad = (angleDeg * Math.PI) / 180;
-
-    return {
-      signal,
-      x: centerX + radius * Math.cos(angleRad),
-      y: centerY + radius * Math.sin(angleRad),
-      angle: angleDeg,
-    };
-  });
-}
-
-/**
  * 클러스터의 다수 sentiment 판단
  */
 export function getMajoritySentiment(

@@ -1,9 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import Image from 'next/image';
-import { MarkerCluster, Signal } from '@/types';
-import { calculateExpandedPositions } from '@/lib/clusterSignals';
+import { MarkerCluster } from '@/types';
 
 interface ExpandedClusterProps {
   cluster: MarkerCluster;
@@ -19,11 +17,15 @@ export default function ExpandedCluster({
   containerBounds,
 }: ExpandedClusterProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
 
   // 외부 클릭 시 닫기
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (backdropRef.current && e.target === backdropRef.current) {
+      if (
+        backdropRef.current &&
+        e.target === backdropRef.current
+      ) {
         onClose();
       }
     };
@@ -44,149 +46,116 @@ export default function ExpandedCluster({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  // 펼쳐진 위치 계산
-  const expandedPositions = calculateExpandedPositions(cluster, 55);
+  // 팝업 위치 계산 (화면 경계 벗어나지 않도록)
+  const getPopupPosition = () => {
+    const popupWidth = 240;
+    const popupHeight = 280; // 예상 최대 높이
+    const padding = 10;
 
-  // 컨테이너 경계 내에 위치 조정
-  const adjustPosition = (x: number, y: number) => {
-    if (!containerBounds) return { x, y };
+    let left = cluster.x;
+    let top = cluster.y + 20; // 클러스터 마커 아래에 표시
 
-    const padding = 20;
-    const adjustedX = Math.max(padding, Math.min(x, containerBounds.width - padding));
-    const adjustedY = Math.max(padding, Math.min(y, containerBounds.height - padding));
+    if (containerBounds) {
+      // 오른쪽 경계 체크
+      if (left + popupWidth / 2 > containerBounds.width - padding) {
+        left = containerBounds.width - popupWidth / 2 - padding;
+      }
+      // 왼쪽 경계 체크
+      if (left - popupWidth / 2 < padding) {
+        left = popupWidth / 2 + padding;
+      }
+      // 아래쪽 경계 체크 - 위로 표시
+      if (top + popupHeight > containerBounds.height - padding) {
+        top = cluster.y - popupHeight - 20;
+      }
+    }
 
-    return { x: adjustedX, y: adjustedY };
+    return { left, top };
   };
+
+  const position = getPopupPosition();
 
   return (
     <>
       {/* 반투명 배경 */}
       <div
         ref={backdropRef}
-        className="absolute inset-0 z-30 bg-black/20"
+        className="absolute inset-0 z-30 bg-black/10"
         aria-hidden="true"
       />
 
-      {/* 중심점 표시 */}
+      {/* 리스트 팝업 */}
       <div
-        className="absolute w-3 h-3 rounded-full bg-point/50 z-40"
+        ref={popupRef}
+        className="absolute z-40 w-[240px] glass-tooltip popup-fade-in overflow-hidden"
         style={{
-          left: cluster.x,
-          top: cluster.y,
-          transform: 'translate(-50%, -50%)',
+          left: position.left,
+          top: position.top,
+          transform: 'translateX(-50%)',
         }}
-      />
-
-      {/* 펼쳐진 시그널들 */}
-      {expandedPositions.map(({ signal, x, y }, index) => {
-        const adjusted = adjustPosition(x, y);
-
-        return (
-          <ExpandedSignalMarker
-            key={signal.id}
-            signal={signal}
-            x={adjusted.x}
-            y={adjusted.y}
-            index={index}
-            onClick={() => onSignalClick(signal.id)}
-          />
-        );
-      })}
-
-      {/* 닫기 버튼 - 모바일에서 더 큰 터치 영역 */}
-      <button
-        className="absolute z-50 w-8 h-8 sm:w-6 sm:h-6 rounded-full bg-bg-elevated border border-border
-          flex items-center justify-center text-fg-secondary hover:text-fg-primary
-          hover:bg-bg-tertiary transition-colors text-lg sm:text-base"
-        style={{
-          left: cluster.x + 60,
-          top: cluster.y - 60,
-          transform: 'translate(-50%, -50%)',
-        }}
-        onClick={onClose}
-        aria-label="클러스터 닫기"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${cluster.signals.length}개의 시그널`}
       >
-        ×
-      </button>
-    </>
-  );
-}
-
-// 펼쳐진 개별 시그널 마커
-interface ExpandedSignalMarkerProps {
-  signal: Signal;
-  x: number;
-  y: number;
-  index: number;
-  onClick: () => void;
-}
-
-function ExpandedSignalMarker({
-  signal,
-  x,
-  y,
-  index,
-  onClick,
-}: ExpandedSignalMarkerProps) {
-  const borderColor =
-    signal.sentiment === 'LONG' ? 'border-emerald-400' : 'border-rose-400';
-  const bgColor =
-    signal.sentiment === 'LONG' ? 'bg-emerald-400/10' : 'bg-rose-400/10';
-
-  return (
-    <div
-      className={`absolute z-40 cursor-pointer transition-all hover:scale-110 marker-expand`}
-      style={{
-        left: x,
-        top: y,
-        transform: 'translate(-50%, -50%)',
-        animationDelay: `${index * 50}ms`,
-      }}
-      onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && onClick()}
-    >
-      {/* 아바타 */}
-      <div
-        className={`w-9 h-9 rounded-full border-2 ${borderColor} ${bgColor}
-          overflow-hidden shadow-lg flex items-center justify-center`}
-      >
-        {signal.influencer?.avatar_url ? (
-          <Image
-            src={signal.influencer.avatar_url}
-            alt={signal.influencer.name || 'User'}
-            width={36}
-            height={36}
-            className="object-cover"
-            unoptimized
-          />
-        ) : (
-          <span className="text-sm text-fg-secondary">
-            {signal.influencer?.name?.[0] || '?'}
+        {/* 헤더 */}
+        <div className="flex items-center justify-between px-3 py-2 border-b border-border-primary/50">
+          <span className="text-xs font-medium text-fg-secondary">
+            {cluster.signals.length} signals
           </span>
-        )}
-      </div>
+          <button
+            onClick={onClose}
+            className="w-6 h-6 flex items-center justify-center rounded-md text-fg-tertiary hover:text-fg-primary hover:bg-bg-tertiary transition-colors"
+            aria-label="닫기"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
-      {/* 이름 라벨 */}
-      <div
-        className="absolute top-full mt-1 left-1/2 -translate-x-1/2 whitespace-nowrap
-          text-[10px] px-1.5 py-0.5 rounded bg-bg-elevated/90 border border-border
-          text-fg-secondary max-w-[80px] truncate"
-      >
-        @{signal.influencer?.handle || 'unknown'}
-      </div>
+        {/* 시그널 리스트 */}
+        <div className="max-h-[224px] overflow-y-auto">
+          {cluster.signals.map((signal) => (
+            <button
+              key={signal.id}
+              onClick={() => onSignalClick(signal.id)}
+              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bg-tertiary/50 transition-colors text-left"
+            >
+              {/* 아바타 */}
+              <div
+                className={`w-7 h-7 rounded-full border-2 overflow-hidden flex-shrink-0 ${
+                  signal.sentiment === 'LONG' ? 'border-success' : 'border-danger'
+                }`}
+              >
+                <img
+                  src={signal.influencer?.avatar_url || '/default-avatar.png'}
+                  alt={signal.influencer?.name || 'User'}
+                  className="w-full h-full object-cover"
+                />
+              </div>
 
-      {/* sentiment 표시 */}
-      <div
-        className="absolute -top-1 -right-1 text-[10px]"
-      >
-        {signal.sentiment === 'LONG' ? (
-          <span className="text-emerald-400">▲</span>
-        ) : (
-          <span className="text-rose-400">▼</span>
-        )}
+              {/* 핸들 + 텍스트 */}
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium text-fg-primary truncate">
+                  @{signal.influencer?.handle || 'unknown'}
+                </div>
+                <div className="text-[10px] text-fg-tertiary truncate">
+                  {signal.original_text?.slice(0, 40)}...
+                </div>
+              </div>
+
+              {/* Sentiment 화살표 */}
+              <span
+                className={`text-sm flex-shrink-0 ${
+                  signal.sentiment === 'LONG' ? 'text-success' : 'text-danger'
+                }`}
+              >
+                {signal.sentiment === 'LONG' ? '▲' : '▼'}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
