@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Signal, FilterType } from '@/types';
+import { Signal, FilterType, Influencer } from '@/types';
 import SignalFeed from './SignalFeed';
 import InfluencerList from './InfluencerList';
 
@@ -16,6 +16,12 @@ interface SidePanelProps {
   selectedInfluencerId: string | null;
   onInfluencerSelect: (influencerId: string | null) => void;
   onSignalSelect: (signalId: string) => void;
+  onShowHistory?: (influencer: Influencer) => void;
+  // 무한 스크롤 props
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
+  totalCount?: number;
 }
 
 export default function SidePanel({
@@ -27,6 +33,11 @@ export default function SidePanel({
   selectedInfluencerId,
   onInfluencerSelect,
   onSignalSelect,
+  onShowHistory,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
+  totalCount,
 }: SidePanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>('signals');
 
@@ -106,6 +117,11 @@ export default function SidePanel({
             filter={filter}
             onFilterChange={onFilterChange}
             onSelect={onSignalSelect}
+            onShowHistory={onShowHistory}
+            hasMore={hasMore}
+            isLoadingMore={isLoadingMore}
+            onLoadMore={onLoadMore}
+            totalCount={totalCount}
           />
         ) : (
           <InfluencerList

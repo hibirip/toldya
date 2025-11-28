@@ -21,6 +21,17 @@ export interface Signal {
   has_media: boolean;        // 미디어 포함 여부
   media_url?: string;        // 이미지/비디오 URL
   media_type?: 'image' | 'video';
+  // 하이브리드 수익률 계산용 (Phase 1)
+  current_profit?: number | null;     // DB에서 가져온 수익률 (과거 시그널용)
+  profit_updated_at?: number | null;  // 수익률 계산 시점 (Unix timestamp)
+}
+
+// 시그널 페이지네이션 응답
+export interface SignalPaginationResponse {
+  signals: Signal[];
+  hasMore: boolean;
+  nextOffset: number;
+  total: number;
 }
 
 export interface CandleData {

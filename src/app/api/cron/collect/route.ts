@@ -1,8 +1,31 @@
 import { NextResponse } from 'next/server';
 import { ApifyClient } from 'apify-client';
 import Anthropic from '@anthropic-ai/sdk';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { fetchBTCTicker, fetchHistoricalBTCPrice } from '@/lib/binance';
+
+// ============================================
+// 설정 타입 정의
+// ============================================
+interface CollectionParams {
+  maxItems: number;
+  confidenceThreshold: number;
+  influencersPerRun: number;
+}
+
+interface CollectionStats {
+  processed: number;
+  saved: number;
+  skippedUrlDuplicate: number;
+  skippedSamePersonDuplicate: number;
+  skippedNeutral: number;
+  errors: string[];
+  // 파이프라인 추적용
+  totalFetched: number;
+  afterUrlDedup: number;
+  afterClaude: number;
+  afterNeutralFilter: number;
+}
 
 // ============================================
 // Twitter 쿠키 설정
@@ -316,6 +339,84 @@ function extractUserInfo(tweet: ApifyTweet): { handle: string; name: string; ima
 }
 
 // ============================================
+// DB 설정 로드 헬퍼 함수
+// ============================================
+async function loadSettings(supabase: SupabaseClient): Promise<{
+  claudePrompt: string;
+  params: CollectionParams;
+  influencerHandles: string[];
+}> {
+  // 1. Claude 프롬프트 로드
+  const { data: promptData } = await supabase
+    .from('admin_settings')
+    .select('value')
+    .eq('key', 'claude_prompt')
+    .single();
+
+  const claudePrompt = promptData?.value
+    ? (typeof promptData.value === 'string' ? promptData.value : JSON.stringify(promptData.value))
+    : CLAUDE_SYSTEM_PROMPT; // fallback to hardcoded
+
+  // 2. 수집 파라미터 로드
+  const { data: paramsData } = await supabase
+    .from('admin_settings')
+    .select('value')
+    .eq('key', 'collection_params')
+    .single();
+
+  const params: CollectionParams = paramsData?.value || {
+    maxItems: 50,
+    confidenceThreshold: 50,
+    influencersPerRun: 40,
+  };
+
+  // 3. 활성 인플루언서 목록 로드
+  const { data: influencers } = await supabase
+    .from('influencers')
+    .select('twitter_handle')
+    .eq('is_active', true)
+    .order('priority', { ascending: false });
+
+  // DB에 인플루언서가 없으면 하드코딩된 풀 사용
+  const influencerHandles = influencers && influencers.length > 0
+    ? influencers.map((i: { twitter_handle: string }) => i.twitter_handle)
+    : INFLUENCER_POOL;
+
+  console.log('[Settings] Loaded from DB:', {
+    promptLength: claudePrompt.length,
+    params,
+    influencerCount: influencerHandles.length,
+  });
+
+  return { claudePrompt, params, influencerHandles };
+}
+
+// ============================================
+// 수집 실행 기록 저장
+// ============================================
+async function saveCollectionRun(
+  supabase: SupabaseClient,
+  stats: CollectionStats,
+  success: boolean
+): Promise<void> {
+  try {
+    await supabase.from('collection_runs').insert({
+      stats: stats,
+      total_fetched: stats.totalFetched,
+      after_url_dedup: stats.afterUrlDedup,
+      after_claude: stats.afterClaude,
+      after_neutral_filter: stats.afterNeutralFilter,
+      saved: stats.saved,
+      errors_count: stats.errors.length,
+      success,
+    });
+    console.log('[CollectionRun] Saved run stats to DB');
+  } catch (error) {
+    console.error('[CollectionRun] Failed to save run stats:', error);
+  }
+}
+
+// ============================================
 // JSON 추출 헬퍼 함수 (강화된 버전)
 // ============================================
 function extractJSON(text: string): string {
@@ -356,13 +457,18 @@ export async function GET() {
   console.log('║          Time:', new Date().toISOString(), '              ║');
   console.log('╚════════════════════════════════════════════════════════════╝');
 
-  const results = {
+  const stats: CollectionStats = {
     processed: 0,
     saved: 0,
     skippedUrlDuplicate: 0,
     skippedSamePersonDuplicate: 0,
     skippedNeutral: 0,
-    errors: [] as string[],
+    errors: [],
+    // 파이프라인 추적
+    totalFetched: 0,
+    afterUrlDedup: 0,
+    afterClaude: 0,
+    afterNeutralFilter: 0,
   };
 
   try {
@@ -388,15 +494,19 @@ export async function GET() {
       console.log('[INIT] Supabase connection OK. Current signals count:', count);
     }
 
+    // DB에서 설정 로드
+    const settings = await loadSettings(supabase);
+    const { claudePrompt, params, influencerHandles } = settings;
+
     // Step A: Apify 크롤링
     console.log('========================================');
     console.log('[Step A] Starting Apify crawl...');
 
-    // 랜덤 셔플 후 40명 선택
-    const shuffled = shuffleArray(INFLUENCER_POOL);
-    const targets = shuffled.slice(0, 40);
+    // 랜덤 셔플 후 N명 선택 (DB 설정 사용)
+    const shuffled = shuffleArray(influencerHandles);
+    const targets = shuffled.slice(0, params.influencersPerRun);
 
-    console.log(`[Shuffle] Pool size: ${INFLUENCER_POOL.length}, Targets: ${targets.length}`);
+    console.log(`[Shuffle] Pool size: ${influencerHandles.length}, Targets: ${targets.length}`);
     console.log(`[Shuffle] Selected: ${targets.slice(0, 10).join(', ')}...`);
 
     // 검색 쿼리 동적 생성
@@ -405,7 +515,7 @@ export async function GET() {
 
     const run = await apifyClient.actor('apidojo/tweet-scraper').call({
       searchTerms: [searchQuery],
-      maxItems: 50,
+      maxItems: params.maxItems,
       sort: 'Latest',
       tweetLanguage: 'en',
       cookies: TWITTER_COOKIES.length > 0 ? TWITTER_COOKIES : undefined,
@@ -413,7 +523,8 @@ export async function GET() {
 
     const { items } = await apifyClient.dataset(run.defaultDatasetId).listItems();
     const tweets = items as unknown as ApifyTweet[];
-    results.processed = tweets.length;
+    stats.processed = tweets.length;
+    stats.totalFetched = tweets.length;
 
     // [Step A 직후] 트윗 개수와 첫 번째 트윗 내용
     console.log('========================================');
@@ -462,7 +573,7 @@ export async function GET() {
         console.log('[Processing] ⚠️ SKIP: Tweet text is NULL or empty!');
         console.log('[Processing] Raw tweet object keys:', Object.keys(tweet));
         console.log('[Processing] Raw tweet sample:', JSON.stringify(tweet).substring(0, 500));
-        results.errors.push(`Tweet ${tweetId}: No text found`);
+        stats.errors.push(`Tweet ${tweetId}: No text found`);
         continue;
       }
 
@@ -476,13 +587,16 @@ export async function GET() {
 
         if (existing) {
           console.log(`[Processing] SKIP: Already exists in DB (id: ${existing.id})`);
-          results.skippedUrlDuplicate++;
+          stats.skippedUrlDuplicate++;
           continue;
         }
 
         if (checkError && checkError.code !== 'PGRST116') {
           console.log(`[Processing] DB check error:`, checkError);
         }
+
+        // URL 중복 통과
+        stats.afterUrlDedup++;
 
         // ========== 인플루언서 조회 (Claude API 호출 전에 먼저 수행) ==========
         console.log(`[Dedup] Looking up influencer: @${userInfo.handle}`);
@@ -511,7 +625,7 @@ export async function GET() {
 
           if (createError) {
             console.log('[Dedup] Influencer creation error:', createError);
-            results.errors.push(`Influencer creation error: ${createError.message}`);
+            stats.errors.push(`Influencer creation error: ${createError.message}`);
             continue;
           }
           influencer = newInfluencer;
@@ -545,7 +659,7 @@ export async function GET() {
         const response = await anthropic.messages.create({
           model: 'claude-3-5-haiku-latest',
           max_tokens: 256,
-          system: CLAUDE_SYSTEM_PROMPT,
+          system: claudePrompt,
           messages: [{ role: 'user', content: tweetText }],
         });
 
@@ -569,24 +683,30 @@ export async function GET() {
         } catch (parseError) {
           console.log('[Step B] JSON PARSE ERROR:', parseError);
           console.log('[Step B] Failed to parse:', jsonStr);
-          results.errors.push(`Tweet ${tweet.id}: JSON parse error - ${String(parseError)}`);
+          stats.errors.push(`Tweet ${tweet.id}: JSON parse error - ${String(parseError)}`);
           continue;
         }
+
+        // Claude 분석 완료
+        stats.afterClaude++;
 
         // NEUTRAL 필터링 (DB constraint는 LONG/SHORT만 허용)
         if (analysis.sentiment === 'NEUTRAL') {
           console.log('[Step B] SKIP: NEUTRAL sentiment');
-          results.skippedNeutral++;
+          stats.skippedNeutral++;
           continue;
         }
 
         // Low confidence 필터링 (50 미만은 신뢰도 부족)
-        if (analysis.confidence < 50) {
+        if (analysis.confidence < params.confidenceThreshold) {
           console.log(`[Step B] SKIP: Low confidence (${analysis.confidence})`);
-          results.skippedNeutral++;
+          stats.skippedNeutral++;
           continue;
         }
         console.log(`[Step B] Sentiment: ${analysis.sentiment}, Confidence: ${analysis.confidence}`);
+
+        // 중립/저신뢰도 필터 통과
+        stats.afterNeutralFilter++;
 
         // ========== 동일인 중복 체크 (같은 sentiment + 24시간 내) ==========
         if (recentSentiments.has(analysis.sentiment)) {
@@ -597,7 +717,7 @@ export async function GET() {
           console.log(`[SAME-PERSON DEDUP] Tweet URL: ${tweetUrl}`);
           console.log(`[SAME-PERSON DEDUP] Already has ${analysis.sentiment} signal within 24h - SKIPPING`);
           console.log('----------------------------------------');
-          results.skippedSamePersonDuplicate++;
+          stats.skippedSamePersonDuplicate++;
           continue;
         }
 
@@ -652,31 +772,31 @@ export async function GET() {
           console.log('[Step C] Error message:', error.message);
           console.log('[Step C] Error details:', error.details);
           console.log('[Step C] Error hint:', error.hint);
-          results.errors.push(`DB error: ${error.code} - ${error.message}`);
+          stats.errors.push(`DB error: ${error.code} - ${error.message}`);
         } else {
-          results.saved++;
+          stats.saved++;
           console.log(`[Step C] ✅ SUCCESS! Saved signal from @${userInfo.handle}: ${analysis.sentiment}`);
           console.log(`[Step C] Inserted/Updated row:`, JSON.stringify(insertedData, null, 2));
         }
       } catch (tweetError) {
         console.log(`[ERROR] Tweet ${tweetId} processing failed:`, tweetError);
-        results.errors.push(`Tweet ${tweetId}: ${String(tweetError)}`);
+        stats.errors.push(`Tweet ${tweetId}: ${String(tweetError)}`);
       }
     }
 
     console.log('╔════════════════════════════════════════════════════════════╗');
     console.log('║                    FINAL SUMMARY                             ║');
     console.log('╠════════════════════════════════════════════════════════════╣');
-    console.log(`║  Processed: ${results.processed} tweets`);
-    console.log(`║  Saved: ${results.saved} signals`);
-    console.log(`║  Skipped (URL duplicate): ${results.skippedUrlDuplicate}`);
-    console.log(`║  Skipped (Same person 24h): ${results.skippedSamePersonDuplicate}`);
-    console.log(`║  Skipped (Neutral): ${results.skippedNeutral}`);
-    console.log(`║  Errors: ${results.errors.length}`);
+    console.log(`║  Processed: ${stats.processed} tweets`);
+    console.log(`║  Saved: ${stats.saved} signals`);
+    console.log(`║  Skipped (URL duplicate): ${stats.skippedUrlDuplicate}`);
+    console.log(`║  Skipped (Same person 24h): ${stats.skippedSamePersonDuplicate}`);
+    console.log(`║  Skipped (Neutral): ${stats.skippedNeutral}`);
+    console.log(`║  Errors: ${stats.errors.length}`);
     console.log('╚════════════════════════════════════════════════════════════╝');
-    if (results.errors.length > 0) {
+    if (stats.errors.length > 0) {
       console.log('[FINAL] Error details:');
-      results.errors.forEach((err, i) => console.log(`  ${i + 1}. ${err}`));
+      stats.errors.forEach((err: string, i: number) => console.log(`  ${i + 1}. ${err}`));
     }
 
     // DB에 실제로 저장되었는지 최종 확인
@@ -685,7 +805,10 @@ export async function GET() {
       .select('*', { count: 'exact', head: true });
     console.log(`[FINAL] Signals count in DB after run: ${finalCount}`);
 
-    return NextResponse.json({ success: true, ...results });
+    // 수집 실행 기록 저장
+    await saveCollectionRun(supabase, stats, true);
+
+    return NextResponse.json({ success: true, ...stats });
   } catch (error) {
     console.error('╔════════════════════════════════════════════════════════════╗');
     console.error('║                    FATAL ERROR                              ║');
@@ -693,6 +816,15 @@ export async function GET() {
     console.error('[FATAL ERROR] Type:', typeof error);
     console.error('[FATAL ERROR] Message:', error instanceof Error ? error.message : String(error));
     console.error('[FATAL ERROR] Stack:', error instanceof Error ? error.stack : 'N/A');
+
+    // 실패한 경우에도 기록 저장 시도
+    try {
+      const supabase = getSupabaseClient();
+      await saveCollectionRun(supabase, stats, false);
+    } catch {
+      console.error('[FATAL ERROR] Failed to save collection run stats');
+    }
+
     return NextResponse.json(
       { success: false, error: String(error) },
       { status: 500 }

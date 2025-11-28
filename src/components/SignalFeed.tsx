@@ -1,8 +1,9 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
-import { Signal, FilterType } from '@/types';
+import { useRef, useEffect, useCallback } from 'react';
+import { Signal, FilterType, Influencer } from '@/types';
 import ClientTime from '@/components/ClientTime';
+import { getHybridProfit } from '@/lib/profitCalculator';
 
 interface SignalFeedProps {
   signals: Signal[];
@@ -11,21 +12,58 @@ interface SignalFeedProps {
   filter: FilterType;
   onFilterChange: (filter: FilterType) => void;
   onSelect: (signalId: string) => void;
+  onShowHistory?: (influencer: Influencer) => void;
+  // 무한 스크롤 props
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
+  totalCount?: number;
 }
 
-export default function SignalFeed({ signals, selectedId, currentPrice, filter, onFilterChange, onSelect }: SignalFeedProps) {
+export default function SignalFeed({
+  signals,
+  selectedId,
+  currentPrice,
+  filter,
+  onFilterChange,
+  onSelect,
+  onShowHistory,
+  hasMore = false,
+  isLoadingMore = false,
+  onLoadMore,
+  totalCount,
+}: SignalFeedProps) {
   const filters: FilterType[] = ['ALL', 'LONG', 'SHORT'];
   const itemRefs = useRef<{ [key: string]: HTMLElement | null }>({});
+  const loadMoreRef = useRef<HTMLLIElement>(null);
 
-  // 수익률 계산 (entry_price가 0이면 null 반환)
-  const calculateReturn = (signal: Signal): number | null => {
-    const entryPrice = signal.entry_price;
-    if (!entryPrice || entryPrice === 0) return null; // 가격 정보 없음
-    const priceDiff = currentPrice - entryPrice;
-    const returnPct = (priceDiff / entryPrice) * 100;
-    const adjustedReturn = signal.sentiment === 'LONG' ? returnPct : -returnPct;
-    return adjustedReturn;
-  };
+  // 하이브리드 수익률 계산 (오늘 시그널만 실시간)
+  const calculateReturn = useCallback(
+    (signal: Signal): number | null => {
+      return getHybridProfit(signal, currentPrice);
+    },
+    [currentPrice]
+  );
+
+  // 무한 스크롤 - Intersection Observer
+  useEffect(() => {
+    if (!hasMore || !onLoadMore || isLoadingMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          onLoadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, onLoadMore, isLoadingMore]);
 
   // 신뢰도 뱃지 색상
   const getTrustColor = (score: number) => {
@@ -77,9 +115,9 @@ export default function SignalFeed({ signals, selectedId, currentPrice, filter, 
                 <div className="flex items-center gap-2">
                   <span
                     className="text-fg-tertiary text-xs font-medium px-2 py-1 rounded-full bg-bg-tertiary/80"
-                    aria-label={`총 ${signals.length}개의 시그널`}
+                    aria-label={`총 ${totalCount ?? signals.length}개의 시그널`}
                   >
-                    {signals.length} signals
+                    {signals.length}{totalCount && totalCount > signals.length ? ` / ${totalCount}` : ''} signals
                   </span>
                 </div>
 
@@ -259,19 +297,37 @@ export default function SignalFeed({ signals, selectedId, currentPrice, filter, 
                       {isSelected && (
                         <footer className="px-3 py-2 sm:px-4 sm:py-3 border-t border-border-primary/50 bg-bg-tertiary/30 rounded-b-2xl">
                           <div className="flex items-center justify-between gap-2">
-                            <a
-                              href={signal.source_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-point/10 text-point rounded-xl hover:bg-point/20 transition-all duration-200 font-medium text-xs sm:text-sm"
-                              onClick={(e) => e.stopPropagation()}
-                              aria-label={`${signal.influencer?.name}의 원본 트윗 보기 (새 탭에서 열림)`}
-                            >
-                              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                              </svg>
-                              <span>원본 트윗</span>
-                            </a>
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={signal.source_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-point/10 text-point rounded-xl hover:bg-point/20 transition-all duration-200 font-medium text-xs sm:text-sm"
+                                onClick={(e) => e.stopPropagation()}
+                                aria-label={`${signal.influencer?.name}의 원본 트윗 보기 (새 탭에서 열림)`}
+                              >
+                                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                                </svg>
+                                <span>원본 트윗</span>
+                              </a>
+                              {signal.influencer && onShowHistory && (
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-bg-tertiary/50 text-fg-secondary rounded-xl hover:bg-bg-tertiary hover:text-fg-primary transition-all duration-200 font-medium text-xs sm:text-sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onShowHistory(signal.influencer!);
+                                  }}
+                                  aria-label={`${signal.influencer.name}의 시그널 히스토리 보기`}
+                                >
+                                  <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <span>히스토리</span>
+                                </button>
+                              )}
+                            </div>
                             <button
                               type="button"
                               className="text-fg-tertiary hover:text-fg-secondary text-xs sm:text-sm transition-colors inline-flex items-center gap-1"
@@ -293,6 +349,23 @@ export default function SignalFeed({ signals, selectedId, currentPrice, filter, 
                   </li>
                 );
               })}
+
+              {/* 무한 스크롤 로딩 트리거 */}
+              {hasMore && (
+                <li ref={loadMoreRef} className="py-4 text-center">
+                  {isLoadingMore ? (
+                    <div className="flex items-center justify-center gap-2 text-fg-tertiary">
+                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      <span className="text-xs">더 불러오는 중...</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-fg-muted">스크롤하여 더 보기</span>
+                  )}
+                </li>
+              )}
 
               {signals.length === 0 && (
                 <li className="text-center py-12 text-fg-tertiary glass-card" role="status">

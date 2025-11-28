@@ -5,19 +5,24 @@ import Header from '@/components/Header';
 import Chart from '@/components/Chart';
 import SidePanel from '@/components/SidePanel';
 import DragHandle from '@/components/DragHandle';
-import { CandleData, FilterType, TimeframeType, Signal, Influencer } from '@/types';
+import SignalDetailModal from '@/components/SignalDetailModal';
+import InfluencerHistoryModal from '@/components/InfluencerHistoryModal';
+import { CandleData, FilterType, TimeframeType, Signal, SignalPaginationResponse } from '@/types';
 import { TickerPrice, fetchBTCCandlesClient } from '@/lib/binance';
 import { useBinanceWebSocket, RealtimeTicker, RealtimeCandle } from '@/hooks/useBinanceWebSocket';
 import { getSupabaseClient } from '@/lib/supabase-client';
 import { getCandleStartTime } from '@/lib/timeUtils';
 
+const SIGNALS_PER_PAGE = 50;
+
 interface DashboardProps {
   initialCandleData: CandleData[];
   ticker: TickerPrice | null;
   initialSignals?: Signal[];  // Supabase에서 가져온 실제 시그널 데이터
+  initialTotalCount?: number; // 전체 시그널 개수
 }
 
-export default function Dashboard({ initialCandleData, ticker: initialTicker, initialSignals = [] }: DashboardProps) {
+export default function Dashboard({ initialCandleData, ticker: initialTicker, initialSignals = [], initialTotalCount }: DashboardProps) {
   const [filter, setFilter] = useState<FilterType>('ALL');
   const [selectedSignalId, setSelectedSignalId] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<TimeframeType>('1h');
@@ -28,6 +33,20 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
 
   // 시그널 state (실시간 업데이트용)
   const [signals, setSignals] = useState<Signal[]>(initialSignals);
+
+  // 차트 마커용 전체 시그널 (피드와 별도)
+  const [chartSignals, setChartSignals] = useState<Signal[]>(initialSignals);
+
+  // 무한 스크롤 상태
+  const [hasMore, setHasMore] = useState(initialTotalCount ? initialSignals.length < initialTotalCount : false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [totalCount, setTotalCount] = useState(initialTotalCount || initialSignals.length);
+
+  // 모달 상태 (피드에 없는 마커 클릭 시)
+  const [modalSignal, setModalSignal] = useState<Signal | null>(null);
+
+  // 인플루언서 히스토리 모달 상태
+  const [historyInfluencer, setHistoryInfluencer] = useState<Signal['influencer'] | null>(null);
 
   // 차트 높이 상태 (모바일용 드래그 리사이즈)
   const [chartHeight, setChartHeight] = useState(40); // 기본값 40vh
@@ -140,6 +159,23 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 의도적으로 빈 의존성 배열 - 마운트 시 한 번만 실행
 
+  // 차트 마커용 전체 시그널 로드 (피드와 별도로)
+  useEffect(() => {
+    const loadAllSignalsForChart = async () => {
+      try {
+        // 전체 시그널 로드 (limit 없이 또는 큰 값)
+        const response = await fetch('/api/signals?limit=1000');
+        if (!response.ok) throw new Error('Failed to fetch chart signals');
+        const data: SignalPaginationResponse = await response.json();
+        setChartSignals(data.signals);
+        console.log('[Dashboard] Loaded', data.signals.length, 'signals for chart markers');
+      } catch (error) {
+        console.error('[Dashboard] Failed to load chart signals:', error);
+      }
+    };
+    loadAllSignalsForChart();
+  }, []);
+
   // 타임프레임 변경 핸들러
   const handleTimeframeChange = useCallback((tf: TimeframeType) => {
     if (tf !== timeframe) {
@@ -202,8 +238,9 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
             has_media: false,
           };
 
-          // 새 시그널을 맨 앞에 추가
+          // 새 시그널을 맨 앞에 추가 (피드 + 차트 마커 모두)
           setSignals((prev) => [newSignal, ...prev]);
+          setChartSignals((prev) => [newSignal, ...prev]);
         }
       )
       .subscribe();
@@ -238,7 +275,29 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
     });
   }, [signals, candleData, timeframe]);
 
-  // 필터링된 시그널 (sentiment + influencer)
+  // 차트 마커용 시그널 (가격 보정 적용)
+  const chartSignalsWithRealPrices = useMemo(() => {
+    if (candleData.length === 0) return chartSignals;
+
+    const candleMap = new Map(candleData.map((c) => [c.time, c]));
+
+    return chartSignals.map((signal) => {
+      if (signal.entry_price && signal.entry_price > 0) {
+        return signal;
+      }
+
+      const alignedTime = getCandleStartTime(signal.signal_timestamp, timeframe);
+      const matchingCandle = candleMap.get(alignedTime);
+
+      if (matchingCandle) {
+        return { ...signal, entry_price: matchingCandle.close };
+      }
+
+      return signal;
+    });
+  }, [chartSignals, candleData, timeframe]);
+
+  // 필터링된 시그널 (sentiment + influencer) - 피드용
   const filteredSignals = useMemo(() => {
     let result = signalsWithRealPrices;
 
@@ -255,10 +314,69 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
     return result;
   }, [filter, signalsWithRealPrices, selectedInfluencerId]);
 
+  // 필터링된 차트 시그널 (sentiment + influencer) - 차트 마커용
+  const filteredChartSignals = useMemo(() => {
+    let result = chartSignalsWithRealPrices;
+
+    // 인플루언서 필터
+    if (selectedInfluencerId) {
+      result = result.filter((s) => s.influencer_id === selectedInfluencerId);
+    }
+
+    // sentiment 필터
+    if (filter !== 'ALL') {
+      result = result.filter((s) => s.sentiment === filter);
+    }
+
+    return result;
+  }, [filter, chartSignalsWithRealPrices, selectedInfluencerId]);
+
   // 시그널 선택 핸들러 (토글 방식 - 카드/마커 클릭 통합)
+  // 피드에 없는 시그널은 모달로 표시
   const handleSignalSelect = useCallback((signalId: string) => {
-    setSelectedSignalId((prev) => (prev === signalId ? null : signalId));
-  }, []);
+    // 현재 필터된 피드에서 해당 시그널 찾기
+    const signalInFeed = filteredSignals.find((s) => s.id === signalId);
+
+    if (signalInFeed) {
+      // 피드에 있는 경우 → 기존 동작 (선택/해제 토글)
+      setSelectedSignalId((prev) => (prev === signalId ? null : signalId));
+      setModalSignal(null);
+    } else {
+      // 피드에 없는 경우 → 차트 시그널에서 찾아서 모달로 표시
+      const signalForModal = chartSignalsWithRealPrices.find((s) => s.id === signalId);
+      if (signalForModal) {
+        setModalSignal(signalForModal);
+        setSelectedSignalId(signalId); // 차트 마커 하이라이트용
+      }
+    }
+  }, [filteredSignals, chartSignalsWithRealPrices]);
+
+  // 무한 스크롤: 더 많은 시그널 로드
+  const loadMoreSignals = useCallback(async () => {
+    if (isLoadingMore || !hasMore) return;
+
+    setIsLoadingMore(true);
+    try {
+      const response = await fetch(`/api/signals?offset=${signals.length}&limit=${SIGNALS_PER_PAGE}`);
+      if (!response.ok) throw new Error('Failed to fetch signals');
+
+      const data: SignalPaginationResponse = await response.json();
+
+      // 중복 제거하면서 새 시그널 추가
+      setSignals((prev) => {
+        const existingIds = new Set(prev.map((s) => s.id));
+        const newSignals = data.signals.filter((s) => !existingIds.has(s.id));
+        return [...prev, ...newSignals];
+      });
+
+      setHasMore(data.hasMore);
+      setTotalCount(data.total);
+    } catch (error) {
+      console.error('[Dashboard] Failed to load more signals:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [isLoadingMore, hasMore, signals.length]);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
@@ -272,7 +390,7 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
         >
           <Chart
             candleData={candleData}
-            signals={filteredSignals}
+            signals={filteredChartSignals}
             onSignalClick={handleSignalSelect}
             selectedSignalId={selectedSignalId}
             timeframe={timeframe}
@@ -302,9 +420,36 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
             selectedInfluencerId={selectedInfluencerId}
             onInfluencerSelect={setSelectedInfluencerId}
             onSignalSelect={handleSignalSelect}
+            onShowHistory={setHistoryInfluencer}
+            hasMore={hasMore}
+            isLoadingMore={isLoadingMore}
+            onLoadMore={loadMoreSignals}
+            totalCount={totalCount}
           />
         </aside>
       </main>
+
+      {/* 피드에 없는 시그널 클릭 시 모달 */}
+      {modalSignal && (
+        <SignalDetailModal
+          signal={modalSignal}
+          currentPrice={currentPrice}
+          onClose={() => {
+            setModalSignal(null);
+            setSelectedSignalId(null);
+          }}
+          onShowHistory={setHistoryInfluencer}
+        />
+      )}
+
+      {/* 인플루언서 히스토리 모달 */}
+      {historyInfluencer && (
+        <InfluencerHistoryModal
+          influencer={historyInfluencer}
+          currentPrice={currentPrice}
+          onClose={() => setHistoryInfluencer(null)}
+        />
+      )}
     </div>
   );
 }

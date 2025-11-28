@@ -1,23 +1,29 @@
 import Dashboard from '@/components/Dashboard';
 import { fetchBTCCandles, fetchBTCTicker } from '@/lib/binance';
-import { fetchSignalsForFrontend } from '@/lib/supabase';
+import { fetchSignalsForFrontend, getSignalCount } from '@/lib/supabase';
 
 // 빌드 타임에 정적 생성하지 않고 런타임에 동적 렌더링
 export const dynamic = 'force-dynamic';
 
+const INITIAL_SIGNALS_LIMIT = 50;
+
 // Supabase 시그널 fetch (에러 시 빈 배열 반환)
 async function fetchSignalsSafe() {
   try {
-    return await fetchSignalsForFrontend(100);
+    const [signals, totalCount] = await Promise.all([
+      fetchSignalsForFrontend(INITIAL_SIGNALS_LIMIT),
+      getSignalCount(),
+    ]);
+    return { signals, totalCount };
   } catch (error) {
     console.error('Failed to fetch signals from Supabase:', error);
-    return []; // DB 연결 실패 시 빈 배열 → Mock 데이터 사용
+    return { signals: [], totalCount: 0 };
   }
 }
 
 export default async function Home() {
   // 서버에서 데이터 fetch (기본값: 1h)
-  const [candleData, ticker, signals] = await Promise.all([
+  const [candleData, ticker, signalData] = await Promise.all([
     fetchBTCCandles('1h'),
     fetchBTCTicker(),
     fetchSignalsSafe(),
@@ -27,7 +33,8 @@ export default async function Home() {
     <Dashboard
       initialCandleData={candleData}
       ticker={ticker}
-      initialSignals={signals}
+      initialSignals={signalData.signals}
+      initialTotalCount={signalData.totalCount}
     />
   );
 }

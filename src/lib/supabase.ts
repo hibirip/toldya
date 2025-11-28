@@ -173,3 +173,19 @@ export async function fetchSignalsForFrontend(limit: number = 50): Promise<Signa
 
   return data.map((item) => transformDBSignalToFrontend(item as DBSignalWithInfluencer));
 }
+
+// 전체 시그널 개수 조회
+export async function getSignalCount(): Promise<number> {
+  const supabase = getSupabase();
+
+  const { count, error } = await supabase
+    .from('signals')
+    .select('*', { count: 'exact', head: true });
+
+  if (error) {
+    console.error('Error fetching signal count:', error);
+    return 0;
+  }
+
+  return count || 0;
+}

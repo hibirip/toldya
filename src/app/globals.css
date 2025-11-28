@@ -723,3 +723,30 @@ body {
 .drop-shadow-glow-danger {
   filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.8)) drop-shadow(0 0 16px rgba(239, 68, 68, 0.4));
 }
+
+/* ===== Bottom Sheet 애니메이션 (모바일) ===== */
+@keyframes sheetSlideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheetSlideDown {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+.sheet-enter {
+  animation: sheetSlideUp 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.sheet-exit {
+  animation: sheetSlideDown 200ms ease-out forwards;
+}
