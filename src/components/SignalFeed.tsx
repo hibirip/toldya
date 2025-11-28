@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState } from 'react';
 import { Signal, FilterType } from '@/types';
-import { toDisplayFormat } from '@/lib/timeUtils';
+import ClientTime from '@/components/ClientTime';
 
 interface SignalFeedProps {
   signals: Signal[];
@@ -209,13 +209,11 @@ export default function SignalFeed({ signals, selectedId, currentPrice, filter, 
                             )}
 
                             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
-                              <time
+                              <ClientTime
+                                timestamp={signal.signal_timestamp}
+                                format="datetime"
                                 className="px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-md bg-bg-tertiary/50 text-fg-tertiary whitespace-nowrap"
-                                dateTime={new Date(signal.signal_timestamp * 1000).toISOString()}
-                                suppressHydrationWarning
-                              >
-                                {toDisplayFormat(signal.signal_timestamp, 'datetime')}
-                              </time>
+                              />
                               <span
                                 className="px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-md bg-bg-tertiary/50 font-mono text-fg-tertiary whitespace-nowrap"
                                 aria-label={hasPrice ? `진입 가격: ${signal.entry_price.toLocaleString()} 달러` : '가격 정보 없음'}

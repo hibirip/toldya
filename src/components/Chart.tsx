@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { createChart, IChartApi, ISeriesApi, CandlestickData, Time, CrosshairMode } from 'lightweight-charts';
 import { Signal, CandleData, TimeframeType, MarkerPosition, MarkerCluster } from '@/types';
-import { getCandleStartTime, toDisplayFormat } from '@/lib/timeUtils';
+import { getCandleStartTime } from '@/lib/timeUtils';
+import ClientTime from './ClientTime';
 import { clusterMarkers } from '@/lib/clusterSignals';
 import { useTheme } from '@/hooks/useTheme';
 import StackedMarker from './StackedMarker';
@@ -748,9 +749,11 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
                 </div>
 
                 {/* 날짜 */}
-                <p className="text-fg-tertiary text-[11px] sm:text-[13px] mt-1.5 sm:mt-2" suppressHydrationWarning>
-                  {toDisplayFormat(tooltip.signal.signal_timestamp, 'long')}
-                </p>
+                <ClientTime
+                  timestamp={tooltip.signal.signal_timestamp}
+                  format="long"
+                  className="text-fg-tertiary text-[11px] sm:text-[13px] mt-1.5 sm:mt-2 block"
+                />
               </div>
             </div>
           </div>
