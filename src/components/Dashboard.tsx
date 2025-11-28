@@ -109,10 +109,23 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
   const fetchCandleData = useCallback(async (tf: TimeframeType) => {
     setIsLoading(true);
     try {
+      console.log('[Dashboard] fetchCandleData called for timeframe:', tf);
+      console.log('[Dashboard] Current time:', new Date().toISOString());
       const data = await fetchBTCCandlesClient(tf);
-      setCandleData(data);
+      console.log('[Dashboard] Received candle data count:', data.length);
+      if (data.length > 0) {
+        const lastCandle = data[data.length - 1];
+        console.log('[Dashboard] Last candle time:', lastCandle.time, '=', new Date(lastCandle.time * 1000).toISOString());
+        console.log('[Dashboard] Last candle close:', lastCandle.close);
+        console.log('[Dashboard] Updating candleData state with fresh data');
+        setCandleData(data);
+      } else {
+        console.warn('[Dashboard] WARNING: Received empty candle data! Keeping existing data.');
+        // 빈 데이터를 받으면 기존 데이터 유지 (stale data가 더 나음)
+      }
     } catch (error) {
-      console.error('Failed to fetch candle data:', error);
+      console.error('[Dashboard] Failed to fetch candle data:', error);
+      // 에러 시에도 기존 데이터 유지
     } finally {
       setIsLoading(false);
     }

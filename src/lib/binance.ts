@@ -112,22 +112,36 @@ export async function fetchBTCCandles(
 export async function fetchBTCCandlesClient(
   interval: TimeframeType = '4h'
 ): Promise<CandleData[]> {
-  const startLimit = TIMEFRAME_START_LIMITS[interval];
+  // 동적으로 startLimit 계산 (모듈 캐시 문제 방지)
+  const now = Date.now();
+  const startLimit = interval === '1h'
+    ? now - 90 * 24 * 60 * 60 * 1000  // 최근 90일
+    : TIMEFRAME_START_LIMITS[interval];
   const allCandles: CandleData[] = [];
   let endTime: number | null = null; // null이면 최신부터
   let reachedStart = false;
 
-  console.log(`[fetchBTCCandlesClient] Starting fetch for ${interval}, startLimit: ${new Date(startLimit).toISOString()}`);
+  console.log(`[fetchBTCCandlesClient] Starting fetch for ${interval}`);
+  console.log(`[fetchBTCCandlesClient] Current time: ${new Date(now).toISOString()}`);
+  console.log(`[fetchBTCCandlesClient] startLimit: ${new Date(startLimit).toISOString()}`);
 
   try {
     while (!reachedStart) {
-      // API URL 구성
-      let url = `${BINANCE_API}/klines?symbol=BTCUSDT&interval=${interval}&limit=${BINANCE_MAX_LIMIT}`;
+      // API URL 구성 (캐시 버스팅 추가)
+      const cacheBuster = Date.now();
+      let url = `${BINANCE_API}/klines?symbol=BTCUSDT&interval=${interval}&limit=${BINANCE_MAX_LIMIT}&_t=${cacheBuster}`;
       if (endTime !== null) {
         url += `&endTime=${endTime}`;
       }
 
-      const response = await fetch(url, { cache: 'no-store' });
+      console.log(`[fetchBTCCandlesClient] Fetching: ${url.replace(`&_t=${cacheBuster}`, '')}`);
+      const response = await fetch(url, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      });
 
       if (!response.ok) {
         throw new Error(`Failed to fetch candle data: ${response.status}`);
@@ -151,9 +165,12 @@ export async function fetchBTCCandlesClient(
 
       allCandles.push(...candles);
 
-      // 가장 오래된 캔들의 시간 (밀리초)
+      // 가장 오래된/최신 캔들의 시간 (밀리초)
       const oldestCandleTime = data[0][0];
-      console.log(`[fetchBTCCandlesClient] Fetched ${data.length} candles, oldest: ${new Date(oldestCandleTime).toISOString()}`);
+      const newestCandleTime = data[data.length - 1][0];
+      console.log(`[fetchBTCCandlesClient] Fetched ${data.length} candles`);
+      console.log(`[fetchBTCCandlesClient] Oldest: ${new Date(oldestCandleTime).toISOString()}`);
+      console.log(`[fetchBTCCandlesClient] Newest: ${new Date(newestCandleTime).toISOString()}`);
 
       // 시작 기준에 도달했는지 확인
       if (oldestCandleTime <= startLimit) {
@@ -179,6 +196,12 @@ export async function fetchBTCCandlesClient(
     const filtered = result.filter((candle) => candle.time >= startLimitSeconds);
 
     console.log(`[fetchBTCCandlesClient] Total candles: ${filtered.length} (after dedup & filter)`);
+    if (filtered.length > 0) {
+      const firstCandle = filtered[0];
+      const lastCandle = filtered[filtered.length - 1];
+      console.log(`[fetchBTCCandlesClient] First candle: ${new Date(firstCandle.time * 1000).toISOString()} (${firstCandle.time})`);
+      console.log(`[fetchBTCCandlesClient] Last candle: ${new Date(lastCandle.time * 1000).toISOString()} (${lastCandle.time})`);
+    }
     return filtered;
   } catch (error) {
     console.error('[fetchBTCCandlesClient] Error:', error);
