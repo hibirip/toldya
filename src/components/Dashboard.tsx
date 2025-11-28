@@ -118,14 +118,14 @@ export default function Dashboard({ initialCandleData, ticker: initialTicker, in
     }
   }, []);
 
-  // 서버에서 데이터를 못 가져온 경우 클라이언트에서 재시도
-  // (Vercel 서버에서 Binance API 차단 시 대응)
+  // 페이지 로드 시 항상 클라이언트에서 최신 데이터 가져오기
+  // (Vercel 서버에서 Binance API 451 차단 대응 - 캐시된 오래된 데이터 갱신)
   useEffect(() => {
-    if (initialCandleData.length === 0 && candleData.length === 0 && !isLoading) {
-      console.log('[Dashboard] Server data empty, fetching from client...');
-      fetchCandleData(timeframe);
-    }
-  }, [initialCandleData.length, candleData.length, isLoading, fetchCandleData, timeframe]);
+    // 초기 로드 시 한 번만 실행
+    console.log('[Dashboard] Fetching fresh candle data from client...');
+    fetchCandleData(timeframe);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 의도적으로 빈 의존성 배열 - 마운트 시 한 번만 실행
 
   // 타임프레임 변경 핸들러
   const handleTimeframeChange = useCallback((tf: TimeframeType) => {
