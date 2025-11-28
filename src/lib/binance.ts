@@ -127,14 +127,13 @@ export async function fetchBTCCandlesClient(
 
   try {
     while (!reachedStart) {
-      // API URL 구성 (캐시 버스팅 추가)
-      const cacheBuster = Date.now();
-      let url = `${BINANCE_API}/klines?symbol=BTCUSDT&interval=${interval}&limit=${BINANCE_MAX_LIMIT}&_t=${cacheBuster}`;
+      // API URL 구성
+      let url = `${BINANCE_API}/klines?symbol=BTCUSDT&interval=${interval}&limit=${BINANCE_MAX_LIMIT}`;
       if (endTime !== null) {
         url += `&endTime=${endTime}`;
       }
 
-      console.log(`[fetchBTCCandlesClient] Fetching: ${url.replace(`&_t=${cacheBuster}`, '')}`);
+      console.log(`[fetchBTCCandlesClient] Fetching: ${url}`);
       // cache: 'no-store'만 사용 (커스텀 헤더는 CORS preflight 트리거하므로 제거)
       const response = await fetch(url, { cache: 'no-store' });
 
