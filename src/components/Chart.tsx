@@ -778,7 +778,20 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
       )}
 
       {/* 로딩 스켈레톤 */}
-      {candleData.length === 0 && (
+      {candleData.length === 0 && !isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-bg-primary">
+          <div className="text-center">
+            <div className="text-fg-muted mb-2">차트 데이터를 불러올 수 없습니다</div>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-3 py-1.5 text-xs bg-point text-white rounded-lg hover:bg-point/80"
+            >
+              새로고침
+            </button>
+          </div>
+        </div>
+      )}
+      {candleData.length === 0 && isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-bg-primary">
           <div className="animate-pulse text-fg-muted">차트 로딩 중...</div>
         </div>
