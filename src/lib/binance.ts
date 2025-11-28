@@ -135,13 +135,8 @@ export async function fetchBTCCandlesClient(
       }
 
       console.log(`[fetchBTCCandlesClient] Fetching: ${url.replace(`&_t=${cacheBuster}`, '')}`);
-      const response = await fetch(url, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-        },
-      });
+      // cache: 'no-store'만 사용 (커스텀 헤더는 CORS preflight 트리거하므로 제거)
+      const response = await fetch(url, { cache: 'no-store' });
 
       if (!response.ok) {
         throw new Error(`Failed to fetch candle data: ${response.status}`);
