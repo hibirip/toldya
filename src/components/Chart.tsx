@@ -329,6 +329,13 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
         ...chartTheme.timeScale,
         timeVisible: true,
       },
+      localization: {
+        // 사용자 로컬 타임존으로 시간 표시
+        timeFormatter: (timestamp: number) => {
+          const date = new Date(timestamp * 1000);
+          return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        },
+      },
     });
 
     chartRef.current = chart;
