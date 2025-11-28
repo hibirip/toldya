@@ -163,6 +163,9 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
       }
     });
 
+    // signalId → candlePrice 맵핑 (클러스터링 후에도 가격 보존)
+    const candlePriceMap = new Map(validMarkers.map((m) => [m.signal.id, m.candlePrice]));
+
     // 클러스터링을 위해 임시로 위치 계산 (초기 렌더링용)
     if (chartRef.current && seriesRef.current) {
       const timeScale = chartRef.current.timeScale();
@@ -186,11 +189,10 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
       const standaloneMarkers: MarkerData[] = [
         ...standalone.map((pos) => {
           const alignedTimeUTC = getCandleStartTime(pos.signal.signal_timestamp, currentTimeframe);
-          const candle = candleMap.get(alignedTimeUTC);
           return {
             signal: pos.signal,
             alignedTime: alignedTimeUTC + tzOffset, // 타임존 오프셋 적용
-            candlePrice: candle?.close ?? pos.signal.entry_price, // fallback to entry_price
+            candlePrice: candlePriceMap.get(pos.signal.id)!, // validMarkers에서 보존된 가격 사용
           };
         }),
         ...outsideMarkers, // 가시 영역 밖 마커도 포함 (이미 candlePrice, alignedTime에 오프셋 적용됨)
@@ -201,11 +203,10 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
         id: cluster.id,
         markers: cluster.signals.map((signal) => {
           const alignedTimeUTC = getCandleStartTime(signal.signal_timestamp, currentTimeframe);
-          const candle = candleMap.get(alignedTimeUTC);
           return {
             signal,
             alignedTime: alignedTimeUTC + tzOffset, // 타임존 오프셋 적용
-            candlePrice: candle?.close ?? signal.entry_price, // fallback to entry_price
+            candlePrice: candlePriceMap.get(signal.id)!, // validMarkers에서 보존된 가격 사용
           };
         }),
       }));
