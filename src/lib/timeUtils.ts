@@ -66,7 +66,7 @@ export function getRelativeTimestamp(hoursAgo: number, minutesAgo: number = 0): 
 }
 
 /**
- * Unix timestamp를 표시용 문자열로 변환
+ * Unix timestamp를 표시용 문자열로 변환 (브라우저 로컬 타임존 사용)
  * @param timestamp - Unix timestamp (초 단위)
  * @param format - 'short' | 'long' | 'datetime'
  */
@@ -76,20 +76,18 @@ export function toDisplayFormat(
 ): string {
   const date = new Date(timestamp * 1000);
 
-  // 서버/클라이언트 hydration 일치를 위해 timeZone 명시
-  const timeZone = 'Asia/Seoul';
+  // 브라우저 로컬 타임존 사용 (timeZone 제거)
+  // SSR/CSR hydration mismatch는 suppressHydrationWarning으로 처리
 
   switch (format) {
     case 'long':
-      return date.toLocaleDateString('ko-KR', {
-        timeZone,
+      return date.toLocaleDateString(undefined, {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
       });
     case 'datetime':
-      return date.toLocaleString('ko-KR', {
-        timeZone,
+      return date.toLocaleString(undefined, {
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
@@ -97,8 +95,7 @@ export function toDisplayFormat(
       });
     case 'short':
     default:
-      return date.toLocaleDateString('ko-KR', {
-        timeZone,
+      return date.toLocaleDateString(undefined, {
         month: 'short',
         day: 'numeric',
       });

@@ -744,7 +744,7 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
                 </div>
 
                 {/* 날짜 */}
-                <p className="text-fg-tertiary text-[11px] sm:text-[13px] mt-1.5 sm:mt-2">
+                <p className="text-fg-tertiary text-[11px] sm:text-[13px] mt-1.5 sm:mt-2" suppressHydrationWarning>
                   {toDisplayFormat(tooltip.signal.signal_timestamp, 'long')}
                 </p>
               </div>

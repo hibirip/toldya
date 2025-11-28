@@ -212,6 +212,7 @@ export default function SignalFeed({ signals, selectedId, currentPrice, filter, 
                               <time
                                 className="px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-md bg-bg-tertiary/50 text-fg-tertiary whitespace-nowrap"
                                 dateTime={new Date(signal.signal_timestamp * 1000).toISOString()}
+                                suppressHydrationWarning
                               >
                                 {toDisplayFormat(signal.signal_timestamp, 'datetime')}
                               </time>
