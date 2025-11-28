@@ -109,7 +109,6 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
   const clusterDataListRef = useRef<ClusterData[]>([]);
 
   const [expandedClusterId, setExpandedClusterId] = useState<string | null>(null);
-  const [isChartReady, setIsChartReady] = useState(false);
   const [tooltip, setTooltip] = useState<{
     visible: boolean;
     x: number;
@@ -140,11 +139,6 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
 
   // 시그널 데이터가 변경될 때 마커 데이터 리스트 업데이트 (React 리렌더링은 여기서만)
   useEffect(() => {
-    // 차트가 준비되지 않았으면 실행하지 않음
-    if (!isChartReady) {
-      return;
-    }
-
     const currentCandleData = candleDataRef.current;
     const currentTimeframe = timeframeRef.current;
 
@@ -230,7 +224,7 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
       markerDataListRef.current = validMarkers;
       clusterDataListRef.current = [];
     }
-  }, [signals, timeframe, candleData, isChartReady]);
+  }, [signals, timeframe, candleData]);
 
   // ref 기반 DOM 조작으로 마커 위치 업데이트 (React 리렌더링 없이)
   // 의존성 없음 - 항상 ref에서 최신 값 참조
@@ -331,9 +325,6 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // 차트 재생성 시 준비 상태 리셋
-    setIsChartReady(false);
-
     const chartTheme = CHART_THEMES[theme as keyof typeof CHART_THEMES];
     const chart = createChart(containerRef.current, {
       layout: chartTheme.layout,
@@ -368,14 +359,13 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
 
     seriesRef.current = candlestickSeries;
 
-    // 차트 준비 완료 신호
-    setIsChartReady(true);
-
     // 초기 데이터 설정
     const currentData = candleDataRef.current;
     if (currentData.length > 0) {
+      // 타임존 오프셋 적용 - UTC → 로컬 시간으로 변환하여 마커와 일관성 유지
+      const tzOffset = getTimezoneOffsetSeconds();
       const formattedData: CandlestickData[] = currentData.map((d) => ({
-        time: d.time as Time,
+        time: (d.time + tzOffset) as Time,
         open: d.open,
         high: d.high,
         low: d.low,
@@ -441,7 +431,6 @@ export default function Chart({ candleData, signals, onSignalClick, selectedSign
     const timer = setTimeout(() => updateMarkerPositions(), 100);
 
     return () => {
-      setIsChartReady(false);
       clearTimeout(timer);
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
